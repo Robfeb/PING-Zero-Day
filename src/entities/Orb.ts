@@ -8,51 +8,128 @@ export class Orb extends Phaser.Physics.Arcade.Image {
   vx: number;
   private platforms: LevelPlatform[];
   frozen = false;
-  private bounceVy: number;
-  private icon?: Phaser.GameObjects.Text;
+  bounceVy: number;
+  private floorY: number;
+  private squashTween?: Phaser.Tweens.Tween;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, tier: Tier, vx: number, platforms: LevelPlatform[], world: 'cybersec' | 'ai' | 'devops' = 'cybersec') {
-    super(scene, x, y, `orb${tier}`);
+  constructor(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    tier: Tier,
+    vx: number,
+    platforms: LevelPlatform[],
+    world: 'cybersec' | 'ai' | 'devops' = 'cybersec',
+    floorY = FLOOR_Y,
+  ) {
+    const textureKey = scene.textures.exists(`orb_${world}_${tier}`)
+      ? `orb_${world}_${tier}`
+      : `orb${tier}`;
+    super(scene, x, y, textureKey);
+
     this.tier = tier;
     this.vx = vx;
     this.platforms = platforms;
     this.bounceVy = TIER[tier].bounceVy;
+    this.floorY = floorY;
+
     scene.add.existing(this);
     scene.physics.add.existing(this);
+
     const radius = TIER[tier].radius;
-    this.setDisplaySize(radius * 2, radius * 2).setDepth(12).setVisible(true).setAlpha(1).setCircle(radius, 0, 0).setCollideWorldBounds(true).setBounce(0).setGravityY(GRAVITY);
-    this.body?.setCircle(radius);
+    // The texture has outer neon brackets and glow padding
+    const texture = scene.textures.get(textureKey);
+    const src = texture.getSourceImage() as HTMLCanvasElement | undefined;
+    const renderSize = src?.width ?? (radius * 2.5);
+
+    this.setDisplaySize(renderSize, renderSize)
+      .setDepth(12)
+      .setVisible(true)
+      .setAlpha(1)
+      .setCollideWorldBounds(true)
+      .setBounce(0)
+      .setGravityY(GRAVITY);
+
+    // Strict circular collision hitbox aligned to center
+    const offset = (renderSize / 2) - radius;
+    this.body?.setCircle(radius, offset, offset);
+
     this.setVelocity(vx, -220);
-    const symbol = world === 'cybersec' ? 'PKG' : world === 'ai' ? 'AI' : 'BUG';
-    this.icon = scene.add.text(x, y, symbol, { fontFamily: 'monospace', fontSize: radius >= 30 ? '12px' : '8px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5).setDepth(13);
+  }
+
+  setFrozen(freeze: boolean): void {
+    this.frozen = freeze;
+    if (freeze) {
+      this.setVelocity(0, 0);
+      this.setTint(0x88eeff);
+    } else {
+      this.clearTint();
+      this.setVelocity(this.vx, this.bounceVy * 0.5);
+    }
+  }
+
+  bounceUp(): void {
+    this.setVelocityY(this.bounceVy);
+    this.triggerBounceJuice();
+  }
+
+  private triggerBounceJuice(): void {
+    if (this.squashTween?.isPlaying()) return;
+    const baseScaleX = this.scaleX;
+    const baseScaleY = this.scaleY;
+    this.squashTween = this.scene.tweens.add({
+      targets: this,
+      scaleX: baseScaleX * 1.15,
+      scaleY: baseScaleY * 0.85,
+      duration: 60,
+      yoyo: true,
+      ease: 'Quad.easeInOut',
+      onComplete: () => {
+        this.setScale(baseScaleX, baseScaleY);
+        this.squashTween = undefined;
+      },
+    });
   }
 
   updateBounce(): void {
+    if (!this.active) return;
     if (this.frozen) {
       this.setVelocity(0, 0);
       return;
     }
 
     const body = this.body as Phaser.Physics.Arcade.Body | null;
+    if (!body) return;
     const radius = TIER[this.tier].radius;
-    const worldWidth = this.scene.scale.width;
+    const worldWidth = this.scene.physics.world.bounds.width || this.scene.scale.width;
 
-    if ((body?.blocked.left || this.x <= radius) && this.vx < 0) {
+    // Spin gently as it moves
+    this.setRotation(this.rotation + this.vx * 0.0008);
+
+    if ((body.blocked.left || this.x <= radius) && this.vx < 0) {
       this.vx = Math.abs(this.vx);
-    } else if ((body?.blocked.right || this.x >= worldWidth - radius) && this.vx > 0) {
+    } else if ((body.blocked.right || this.x >= worldWidth - radius) && this.vx > 0) {
       this.vx = -Math.abs(this.vx);
     }
 
     this.setVelocityX(this.vx);
-    if (body?.blocked.down || body?.touching.down) {
+
+    if (body.blocked.down || body.touching.down) {
       this.setVelocityY(this.bounceVy);
+      this.triggerBounceJuice();
     }
 
     let platformSurface: number | undefined;
     for (const platform of this.platforms) {
       const left = platform.x - platform.width / 2;
       const right = platform.x + platform.width / 2;
-      if (this.x >= left && this.x <= right && this.y + radius >= platform.y && this.y + radius <= platform.y + 14 && this.body!.velocity.y > 0) {
+      if (
+        this.x >= left &&
+        this.x <= right &&
+        this.y + radius >= platform.y &&
+        this.y + radius <= platform.y + 14 &&
+        body.velocity.y > 0
+      ) {
         platformSurface = platform.y;
       }
     }
@@ -60,16 +137,15 @@ export class Orb extends Phaser.Physics.Arcade.Image {
     if (platformSurface !== undefined) {
       this.y = platformSurface - radius;
       this.setVelocityY(this.bounceVy);
-    } else if (this.y + radius >= FLOOR_Y && this.body!.velocity.y > 0) {
-      this.y = FLOOR_Y - radius;
+      this.triggerBounceJuice();
+    } else if (this.y + radius >= this.floorY && body.velocity.y > 0) {
+      this.y = this.floorY - radius;
       this.setVelocityY(this.bounceVy);
+      this.triggerBounceJuice();
     }
-
-    this.icon?.setPosition(this.x, this.y);
   }
 
   destroyIcon(): void {
-    this.icon?.destroy();
-    this.icon = undefined;
+    // Retained for API compatibility with existing GameScene calls
   }
 }

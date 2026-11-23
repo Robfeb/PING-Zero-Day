@@ -13,6 +13,8 @@ const config: Phaser.Types.Core.GameConfig = {
   width: GAME_WIDTH,
   height: GAME_HEIGHT,
   backgroundColor: '#0a0e17',
+  autoFocus: true,
+  fps: { target: 60, forceSetTimeOut: false },
   physics: {
     default: 'arcade',
     arcade: { gravity: { x: 0, y: 0 }, debug: false },
