@@ -3,6 +3,12 @@ import { FLOOR_Y, GAME_WIDTH } from '../config/constants';
 
 export type PlayerState = 'FALLING' | 'STANDING' | 'WALKING' | 'CLIMBING' | 'JUMPING';
 
+export interface ActiveLadderBounds {
+  x: number;
+  top: number;
+  bottom: number;
+}
+
 export class Player extends Phaser.Physics.Arcade.Image {
   shield = false;
   iframeUntil = 0;
@@ -14,14 +20,14 @@ export class Player extends Phaser.Physics.Arcade.Image {
     super(scene, x, y, 'hero_walk_0');
     scene.add.existing(this);
     scene.physics.add.existing(this);
-    this.setDisplaySize(38, 56)
+    this.setDisplaySize(46, 60)
       .setCollideWorldBounds(true)
       .setDepth(20)
       .setGravityY(950)
       .setVisible(true)
       .setAlpha(1);
-    this.body?.setSize(22, 42);
-    this.body?.setOffset(8, 14);
+    this.body?.setSize(22, 44);
+    this.body?.setOffset(12, 14);
   }
 
   isGrounded(): boolean {
@@ -44,40 +50,92 @@ export class Player extends Phaser.Physics.Arcade.Image {
   }
 
   updateLadder(
-    ladderX: number | undefined,
+    ladder: ActiveLadderBounds | undefined,
     up: boolean,
     down: boolean,
     left: boolean,
     right: boolean,
   ): void {
+    const feetY = this.body ? this.body.bottom : this.y + 28;
+
     if (this.state === 'CLIMBING') {
-      this.x = Phaser.Math.Linear(this.x, ladderX ?? this.x, 0.28);
+      // If player is no longer on a valid ladder, exit climb immediately
+      if (!ladder) {
+        this.state = 'FALLING';
+        this.setGravityY(950);
+        this.onLadder = false;
+        return;
+      }
+
+      // Smooth horizontal snap to ladder center
+      this.x = Phaser.Math.Linear(this.x, ladder.x, 0.35);
       this.setVelocityX(0);
-      this.setGravityY(0);
+
+      // Check if player dismounts horizontally
       if (left || right) {
         this.state = 'WALKING';
         this.setGravityY(950);
+        this.onLadder = false;
         this.climb(0);
-      } else if (up) this.climb(-1);
-      else if (down) this.climb(1);
-      else this.climb(0);
+        return;
+      }
+
+      // Reached the TOP of the ladder! Clamp and step onto the platform
+      if (up && feetY <= ladder.top + 6) {
+        if (this.body) {
+          this.y = ladder.top - this.body.height / 2 - this.body.offset.y + 2;
+        } else {
+          this.y = ladder.top - 28;
+        }
+        this.state = 'STANDING';
+        this.setGravityY(950);
+        this.setVelocityY(0);
+        this.onLadder = false;
+        return;
+      }
+
+      // Reached the BOTTOM of the ladder! Clamp and stand on floor
+      if (down && feetY >= ladder.bottom - 2) {
+        this.state = 'STANDING';
+        this.setGravityY(950);
+        this.setVelocityY(0);
+        this.onLadder = false;
+        return;
+      }
+
+      // Actively climbing within ladder bounds
+      this.setGravityY(0);
+      if (up) {
+        this.climb(-1);
+      } else if (down) {
+        this.climb(1);
+      } else {
+        this.climb(0);
+      }
       return;
     }
 
-    // Enter climb only if centered and not already jumping
-    if (ladderX !== undefined && (up || down) && Math.abs(this.x - ladderX) <= 18) {
-      this.state = 'CLIMBING';
-      this.onLadder = true;
-      this.x = ladderX;
-      this.setGravityY(0);
-      this.setVelocity(0, up ? -160 : down ? 160 : 0);
-      return;
+    // Entering ladder from standing or falling
+    if (ladder && (up || down) && Math.abs(this.x - ladder.x) <= 22) {
+      // Only enter climb if player is within vertical ladder bounds
+      const canClimbUp = up && feetY > ladder.top + 8 && feetY <= ladder.bottom + 12;
+      const canClimbDown = down && feetY >= ladder.top - 6 && feetY < ladder.bottom - 4;
+
+      if (canClimbUp || canClimbDown) {
+        this.state = 'CLIMBING';
+        this.onLadder = true;
+        this.x = ladder.x;
+        this.setGravityY(0);
+        this.setVelocity(0, up ? -160 : 160);
+        return;
+      }
     }
 
     this.onLadder = false;
   }
 
   move(direction: number, speed = 230): void {
+    if (!this.body) return;
     if (this.state !== 'CLIMBING') {
       if (this.isGrounded()) {
         this.state = direction === 0 ? 'STANDING' : 'WALKING';
@@ -92,10 +150,12 @@ export class Player extends Phaser.Physics.Arcade.Image {
   }
 
   climb(direction: number): void {
+    if (!this.body) return;
     this.setVelocityY(direction * 160);
   }
 
   stop(): void {
+    if (!this.body) return;
     this.setVelocityX(0);
     if (this.state !== 'CLIMBING') {
       if (this.isGrounded()) this.setVelocityY(0);
@@ -127,7 +187,9 @@ export class Player extends Phaser.Physics.Arcade.Image {
 
   reset(x = GAME_WIDTH / 2, y = FLOOR_Y - 26): void {
     this.setPosition(x, y);
-    this.setVelocity(0, 0);
+    if (this.body) {
+      this.setVelocity(0, 0);
+    }
     this.state = 'FALLING';
     this.setAlpha(1);
     this.clearTint();

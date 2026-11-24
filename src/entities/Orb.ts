@@ -59,6 +59,7 @@ export class Orb extends Phaser.Physics.Arcade.Image {
 
   setFrozen(freeze: boolean): void {
     this.frozen = freeze;
+    if (!this.active || !this.body) return;
     if (freeze) {
       this.setVelocity(0, 0);
       this.setTint(0x88eeff);
@@ -69,11 +70,13 @@ export class Orb extends Phaser.Physics.Arcade.Image {
   }
 
   bounceUp(): void {
+    if (!this.active || !this.body) return;
     this.setVelocityY(this.bounceVy);
     this.triggerBounceJuice();
   }
 
   private triggerBounceJuice(): void {
+    if (!this.active) return;
     if (this.squashTween?.isPlaying()) return;
     const baseScaleX = this.scaleX;
     const baseScaleY = this.scaleY;
@@ -85,6 +88,7 @@ export class Orb extends Phaser.Physics.Arcade.Image {
       yoyo: true,
       ease: 'Quad.easeInOut',
       onComplete: () => {
+        if (!this.active) return;
         this.setScale(baseScaleX, baseScaleY);
         this.squashTween = undefined;
       },
@@ -92,7 +96,7 @@ export class Orb extends Phaser.Physics.Arcade.Image {
   }
 
   updateBounce(): void {
-    if (!this.active) return;
+    if (!this.active || !this.body) return;
     if (this.frozen) {
       this.setVelocity(0, 0);
       return;
@@ -147,5 +151,13 @@ export class Orb extends Phaser.Physics.Arcade.Image {
 
   destroyIcon(): void {
     // Retained for API compatibility with existing GameScene calls
+  }
+
+  destroy(fromScene?: boolean): void {
+    if (this.squashTween) {
+      this.squashTween.stop();
+      this.squashTween = undefined;
+    }
+    super.destroy(fromScene);
   }
 }

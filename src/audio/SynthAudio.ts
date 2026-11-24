@@ -158,6 +158,27 @@ export class SynthAudio {
     );
   }
 
+  playPatchShoot(): void {
+    this.tone(520, 0.07, 'square', 0.05);
+    setTimeout(() => this.tone(680, 0.09, 'sine', 0.04), 25);
+  }
+
+  playServerHeal(): void {
+    [440, 554, 659].forEach((n, i) =>
+      setTimeout(() => this.tone(n, 0.12, 'sine', 0.05), i * 60),
+    );
+  }
+
+  playServerShield(): void {
+    this.tone(330, 0.18, 'triangle', 0.06);
+    setTimeout(() => this.tone(495, 0.22, 'sine', 0.05), 50);
+  }
+
+  playWeaponSwitch(): void {
+    this.tone(260, 0.06, 'triangle', 0.04);
+    setTimeout(() => this.tone(390, 0.08, 'square', 0.04), 30);
+  }
+
   getCurrentTrackName(): string {
     return this.currentTrack.name;
   }

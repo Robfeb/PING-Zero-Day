@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 
-export type PowerKind = 'freeze' | 'shield' | 'double' | 'triple' | 'sticky';
+export type PowerKind = 'freeze' | 'shield' | 'double' | 'triple' | 'sticky' | 'patch' | 'firewall';
 
 export class PowerUp extends Phaser.Physics.Arcade.Image {
   kind: PowerKind;

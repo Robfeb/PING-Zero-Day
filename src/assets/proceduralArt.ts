@@ -34,13 +34,35 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 }
 
 // ---------------------------------------------------------------------------
-// 1. HERO CHARACTER GENERATION (MODERN FANCY CYBER OPERATIVE)
+// 1. HERO CHARACTER GENERATION (VIBRANT ARCADE COMIC-BOOK SPRITE)
 // ---------------------------------------------------------------------------
 function bakeHeroTextures(scene: Phaser.Scene): void {
-  const width = 38;
-  const height = 56;
+  const width = 46;
+  const height = 60;
 
-  // Helper for drawing modern cyber operative
+  // Comic Color Palette
+  const INK = '#060913';          // Bold comic inking lines
+  const SKIN = '#ffe2cc';         // Warm anime peach skin
+  const SKIN_SHADOW = '#df9b70';  // Warm skin cel-shadow
+  const HAIR_CYAN = '#00f0ff';    // Vivid electric cyan comic hair
+  const HAIR_SHADOW = '#007b99';  // Deep cyan hair shadow
+  const HAIR_SHINE = '#ffffff';   // Pure white specular spike gleams
+  const SCARF = '#ff2244';        // Dynamic crimson hero scarf
+  const SCARF_SHADOW = '#8f001c'; // Crimson fabric fold shadow
+  const SCARF_HILIGHT = '#ff758d';// Crimson edge highlight
+  const JACKET = '#152238';       // Tactical midnight navy jacket
+  const JACKET_LIGHT = '#243a5e'; // Highlight armor chestplate
+  const JACKET_SHADOW = '#080d17';// Deep shadow folds
+  const NEON_CYAN = '#00f0ff';    // Glowing cyber trim & soles
+  const GOLD = '#ffd700';         // Hazard badge / belt buckle / muzzle sparks
+  const VISOR_PINK = '#ff007f';   // Cyber magenta visor lenses
+  const PANTS = '#182335';        // Tactical cargo pants
+  const SNEAKER_UPPER = '#1e293b';// Hi-top sneaker leather
+  const WHITE = '#ffffff';        // Toe caps & glints
+  const LIME = '#39ff14';         // Comms LED
+  const GUN_METAL = '#334155';    // Harpoon buster casing
+
+  // Helper for drawing stylized comic hero sprite
   const drawHero = (
     ctx: CanvasRenderingContext2D,
     mode: 'walk' | 'fire' | 'climb' | 'jump',
@@ -51,300 +73,851 @@ function bakeHeroTextures(scene: Phaser.Scene): void {
     const isClimb = mode === 'climb';
     const isFire = mode === 'fire';
     const isJump = mode === 'jump';
+    const isWalk = mode === 'walk';
 
-    // 1. Rear Cyberdeck / Power Unit
+    // Walk cycle bobbing
+    const bob = isWalk && (frame === 1 || frame === 3) ? 2 : 0;
+    const headBob = bob;
+
+    // -------------------------------------------------------------------------
+    // 1. REAR BILLOWING COMIC SCARF (WIND & MOTION STREAMERS)
+    // -------------------------------------------------------------------------
     if (!isClimb) {
-      ctx.fillStyle = '#081424';
-      ctx.strokeStyle = '#00f0ff';
-      ctx.lineWidth = 1.6;
-      roundRect(ctx, 4, 18, 8, 18, 3);
-      ctx.fill();
-      ctx.stroke();
+      ctx.save();
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
 
-      // Glowing power cells
-      ctx.fillStyle = '#00f0ff';
-      ctx.fillRect(6, 21, 4, 2.5);
-      ctx.fillStyle = '#39ff14';
-      ctx.fillRect(6, 26, 4, 2.5);
-      ctx.fillStyle = '#ff2a55';
-      ctx.fillRect(6, 31, 4, 2.5);
+      if (isJump) {
+        // High billowing upward/backward scarf in the rushing air
+        ctx.fillStyle = SCARF_SHADOW;
+        ctx.beginPath();
+        ctx.moveTo(21, 23);
+        ctx.quadraticCurveTo(12, 18, 4, 15);
+        ctx.lineTo(8, 22);
+        ctx.quadraticCurveTo(14, 23, 21, 26);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = SCARF;
+        ctx.beginPath();
+        ctx.moveTo(21, 22);
+        ctx.quadraticCurveTo(10, 16, 2, 12);
+        ctx.lineTo(6, 18);
+        ctx.quadraticCurveTo(13, 20, 21, 25);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = INK;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Edge highlight
+        ctx.strokeStyle = SCARF_HILIGHT;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(21, 22);
+        ctx.quadraticCurveTo(10, 16, 2, 12);
+        ctx.stroke();
+      } else if (isFire) {
+        // Recoil whip backward
+        ctx.fillStyle = SCARF_SHADOW;
+        ctx.beginPath();
+        ctx.moveTo(21, 24);
+        ctx.quadraticCurveTo(11, 27, 3, 31);
+        ctx.lineTo(7, 35);
+        ctx.quadraticCurveTo(15, 30, 21, 27);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = SCARF;
+        ctx.beginPath();
+        ctx.moveTo(21, 23);
+        ctx.quadraticCurveTo(10, 23, 2, 26);
+        ctx.lineTo(7, 30);
+        ctx.quadraticCurveTo(14, 27, 21, 26);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = INK;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      } else {
+        // Dynamic horizontal flutter with 2 ribbon tails
+        const wave = frame === 0 ? 0 : frame === 1 ? -2 : frame === 2 ? 1 : -1;
+
+        // Lower streamer (shadow)
+        ctx.fillStyle = SCARF_SHADOW;
+        ctx.beginPath();
+        ctx.moveTo(20, 24 + bob);
+        ctx.quadraticCurveTo(11, 28 + wave + bob, 4, 32 + wave + bob);
+        ctx.lineTo(9, 36 + wave + bob);
+        ctx.quadraticCurveTo(15, 30 + bob, 20, 27 + bob);
+        ctx.closePath();
+        ctx.fill();
+
+        // Upper main streamer
+        ctx.fillStyle = SCARF;
+        ctx.beginPath();
+        ctx.moveTo(20, 22 + bob);
+        ctx.quadraticCurveTo(10, 24 + wave + bob, 3, 26 + wave + bob);
+        ctx.lineTo(7, 31 + wave + bob);
+        ctx.quadraticCurveTo(14, 27 + wave + bob, 20, 26 + bob);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = INK;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Edge gleam
+        ctx.strokeStyle = SCARF_HILIGHT;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(20, 22 + bob);
+        ctx.quadraticCurveTo(10, 24 + wave + bob, 3, 26 + wave + bob);
+        ctx.stroke();
+      }
+      ctx.restore();
     }
 
-    // 2. Legs & Thruster Boots
-    ctx.lineWidth = 4;
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = '#091526';
+    // -------------------------------------------------------------------------
+    // 2. REAR ARM (WALK / JUMP)
+    // -------------------------------------------------------------------------
+    if (!isClimb && !isFire) {
+      ctx.save();
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
 
-    let leftFootX = 13;
-    let leftFootY = 52;
-    let rightFootX = 25;
-    let rightFootY = 52;
+      let armHandX = 12;
+      let armHandY = 35 + bob;
+      if (isWalk) {
+        if (frame === 0) { armHandX = 9; armHandY = 37 + bob; }
+        else if (frame === 1) { armHandX = 14; armHandY = 33 + bob; }
+        else if (frame === 2) { armHandX = 17; armHandY = 31 + bob; }
+        else { armHandX = 13; armHandY = 34 + bob; }
+      } else if (isJump) {
+        armHandX = 8;
+        armHandY = 28;
+      }
 
-    if (mode === 'walk') {
+      // Black ink contour
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(16, 26 + bob);
+      ctx.lineTo(armHandX, armHandY);
+      ctx.stroke();
+
+      // Sleeve fill
+      ctx.strokeStyle = JACKET_SHADOW;
+      ctx.lineWidth = 3.2;
+      ctx.beginPath();
+      ctx.moveTo(16, 26 + bob);
+      ctx.lineTo(armHandX, armHandY);
+      ctx.stroke();
+
+      // Comic fingerless glove
+      ctx.fillStyle = WHITE;
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.arc(armHandX, armHandY, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. LEGS & CHUNKY HI-TOP RETRO SNEAKERS
+    // -------------------------------------------------------------------------
+    let leftFootX = 14;
+    let leftFootY = 55;
+    let rightFootX = 32;
+    let rightFootY = 53;
+
+    if (isWalk) {
       if (frame === 0) {
-        leftFootX = 9; leftFootY = 52;
-        rightFootX = 28; rightFootY = 49;
+        leftFootX = 13; leftFootY = 56;
+        rightFootX = 33; rightFootY = 53;
       } else if (frame === 1) {
-        leftFootX = 15; leftFootY = 50;
-        rightFootX = 22; rightFootY = 50;
+        leftFootX = 19; leftFootY = 55;
+        rightFootX = 27; rightFootY = 54;
       } else if (frame === 2) {
-        leftFootX = 28; leftFootY = 49;
-        rightFootX = 9; rightFootY = 52;
+        leftFootX = 33; leftFootY = 53;
+        rightFootX = 13; rightFootY = 56;
       } else if (frame === 3) {
-        leftFootX = 22; leftFootY = 50;
-        rightFootX = 15; rightFootY = 50;
+        leftFootX = 27; leftFootY = 54;
+        rightFootX = 19; rightFootY = 55;
       }
     } else if (isFire) {
-      leftFootX = 8; leftFootY = 52;
-      rightFootX = 29; rightFootY = 52;
+      // Wide planted recoil combat stance
+      leftFootX = 10; leftFootY = 56;
+      rightFootX = 36; rightFootY = 56;
     } else if (isJump) {
-      // Tucked air pose
-      leftFootX = 11; leftFootY = 46;
-      rightFootX = 27; rightFootY = 46;
+      // Athletic tucked airborne kick
+      leftFootX = 16; leftFootY = 48;
+      rightFootX = 30; rightFootY = 47;
     } else if (isClimb) {
       if (frame === 0) {
-        leftFootX = 12; leftFootY = 50;
-        rightFootX = 24; rightFootY = 53;
+        leftFootX = 16; leftFootY = 55;
+        rightFootX = 30; rightFootY = 49;
       } else {
-        leftFootX = 12; leftFootY = 53;
-        rightFootX = 24; rightFootY = 50;
+        leftFootX = 16; leftFootY = 49;
+        rightFootX = 30; rightFootY = 55;
       }
     }
 
-    // Left leg
-    ctx.beginPath();
-    ctx.moveTo(15, 36);
-    ctx.lineTo(leftFootX, leftFootY);
-    ctx.stroke();
+    // Draw Pants Leg
+    const drawPantsLeg = (hipX: number, footX: number, footY: number) => {
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
 
-    // Right leg
-    ctx.beginPath();
-    ctx.moveTo(23, 36);
-    ctx.lineTo(rightFootX, rightFootY);
-    ctx.stroke();
+      const kneeX = (hipX + footX) / 2 + (isJump ? -2 : 0);
+      const kneeY = (41 + bob + footY) / 2;
 
-    // Modern Heavy Cyber-Boots
-    const drawBoot = (bx: number, by: number) => {
-      ctx.fillStyle = '#12253e';
-      ctx.strokeStyle = '#00f0ff';
+      // Heavy comic ink stroke
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(hipX, 40 + bob);
+      ctx.lineTo(kneeX, kneeY);
+      ctx.lineTo(footX, footY - 4);
+      ctx.stroke();
+
+      // Cargo pants fabric fill
+      ctx.strokeStyle = PANTS;
+      ctx.lineWidth = 3.6;
+      ctx.beginPath();
+      ctx.moveTo(hipX, 40 + bob);
+      ctx.lineTo(kneeX, kneeY);
+      ctx.lineTo(footX, footY - 4);
+      ctx.stroke();
+
+      // Stylized reinforced knee pad
+      ctx.fillStyle = JACKET_LIGHT;
+      ctx.strokeStyle = INK;
       ctx.lineWidth = 1.4;
-      roundRect(ctx, bx - 5, by - 5, 10, 6, 2);
+      ctx.beginPath();
+      ctx.arc(kneeX, kneeY, 2.8, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
 
-      // Glowing thruster sole
-      ctx.fillStyle = '#00f0ff';
-      ctx.fillRect(bx - 5, by + 1, 10, 2.5);
-
-      // Thruster flame if jumping!
-      if (isJump) {
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.moveTo(bx - 3, by + 3);
-        ctx.lineTo(bx, by + 9);
-        ctx.lineTo(bx + 3, by + 3);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.fillStyle = '#00f0ff';
-        ctx.beginPath();
-        ctx.moveTo(bx - 4, by + 3);
-        ctx.lineTo(bx, by + 12);
-        ctx.lineTo(bx + 4, by + 3);
-        ctx.closePath();
-        ctx.fill();
-      }
+      // Glowing knee rivet
+      ctx.fillStyle = NEON_CYAN;
+      ctx.fillRect(kneeX - 0.75, kneeY - 0.75, 1.5, 1.5);
+      ctx.restore();
     };
-    drawBoot(leftFootX, leftFootY);
-    drawBoot(rightFootX, rightFootY);
 
-    // 3. Torso / Nanotech Tactical Exoskeleton
-    const bob = (mode === 'walk' && (frame === 1 || frame === 3)) ? 1 : 0;
-    const bodyY = 17 + bob;
+    // Draw Hi-Top Sneaker
+    const drawSneaker = (bx: number, by: number) => {
+      ctx.save();
+      ctx.lineJoin = 'round';
 
-    // Body armor plate gradient
-    const armorGrad = ctx.createLinearGradient(10, bodyY, 28, bodyY + 20);
-    armorGrad.addColorStop(0, '#162d4c');
-    armorGrad.addColorStop(0.5, '#0d1e34');
-    armorGrad.addColorStop(1, '#071220');
-    ctx.fillStyle = armorGrad;
-    ctx.strokeStyle = '#00f0ff';
-    ctx.lineWidth = 2;
-    roundRect(ctx, 10, bodyY, 18, 19, 4);
+      const ox = bx - 6;
+      const oy = by - 6;
+
+      // Hi-top sneaker body with bold ink outline
+      ctx.fillStyle = SNEAKER_UPPER;
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 2;
+      roundRect(ctx, ox, oy, 13, 7, 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Crimson lightning/side stripe
+      ctx.fillStyle = SCARF;
+      ctx.beginPath();
+      ctx.moveTo(ox + 3, oy + 2);
+      ctx.lineTo(ox + 8, oy + 2);
+      ctx.lineTo(ox + 6, oy + 5);
+      ctx.lineTo(ox + 2, oy + 5);
+      ctx.closePath();
+      ctx.fill();
+
+      // White comic rubber toe cap
+      ctx.fillStyle = WHITE;
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(ox + 10.5, oy + 3.8, 2.5, -Math.PI / 2, Math.PI / 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Black rubber bottom tread
+      ctx.fillStyle = INK;
+      ctx.fillRect(ox, oy + 6, 13, 2);
+
+      // Glowing neon cyan sole trim
+      ctx.fillStyle = NEON_CYAN;
+      ctx.fillRect(ox + 1, oy + 6.5, 11, 1.5);
+
+      // Thruster flame jets if jumping!
+      if (isJump) {
+        // Outer fiery orange comic cone
+        ctx.fillStyle = '#ff4400';
+        ctx.beginPath();
+        ctx.moveTo(ox + 1, oy + 8);
+        ctx.lineTo(ox + 6.5, oy + 15);
+        ctx.lineTo(ox + 12, oy + 8);
+        ctx.closePath();
+        ctx.fill();
+
+        // Mid cyan plasma jet
+        ctx.fillStyle = NEON_CYAN;
+        ctx.beginPath();
+        ctx.moveTo(ox + 2.5, oy + 8);
+        ctx.lineTo(ox + 6.5, oy + 12);
+        ctx.lineTo(ox + 10.5, oy + 8);
+        ctx.closePath();
+        ctx.fill();
+
+        // Inner pure white blazing core
+        ctx.fillStyle = WHITE;
+        ctx.beginPath();
+        ctx.moveTo(ox + 4, oy + 8);
+        ctx.lineTo(ox + 6.5, oy + 10);
+        ctx.lineTo(ox + 9, oy + 8);
+        ctx.closePath();
+        ctx.fill();
+
+        // Golden spark particles
+        ctx.fillStyle = GOLD;
+        ctx.fillRect(ox + 1, oy + 13, 1.5, 1.5);
+        ctx.fillRect(ox + 11, oy + 14, 1.5, 1.5);
+      }
+      ctx.restore();
+    };
+
+    // Draw left and right legs
+    drawPantsLeg(19, leftFootX, leftFootY);
+    drawPantsLeg(27, rightFootX, rightFootY);
+    drawSneaker(leftFootX, leftFootY);
+    drawSneaker(rightFootX, rightFootY);
+
+    // -------------------------------------------------------------------------
+    // 4. TORSO, CYBER JACKET & TACTICAL COMBAT BELT
+    // -------------------------------------------------------------------------
+    const torsoY = 22 + bob;
+    ctx.save();
+    ctx.lineJoin = 'round';
+
+    // Main jacket midnight navy armor
+    ctx.fillStyle = JACKET;
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 2.2;
+    roundRect(ctx, 14, torsoY, 18, 17, 3);
     ctx.fill();
     ctx.stroke();
 
-    // Futuristic chest energy core & harness
-    ctx.strokeStyle = '#00f0ff';
+    // Inner highlight chest plate
+    ctx.fillStyle = JACKET_LIGHT;
+    roundRect(ctx, 17, torsoY + 2, 12, 12, 2);
+    ctx.fill();
+
+    // Cyber neon piping (zipper & seams)
+    ctx.strokeStyle = NEON_CYAN;
     ctx.lineWidth = 1.4;
     ctx.beginPath();
-    ctx.moveTo(13, bodyY + 4); ctx.lineTo(25, bodyY + 4);
-    ctx.moveTo(19, bodyY + 4); ctx.lineTo(19, bodyY + 16);
+    ctx.moveTo(23, torsoY + 2);
+    ctx.lineTo(23, torsoY + 14);
     ctx.stroke();
 
-    // Glowing cyan chest reactor diamond
-    ctx.fillStyle = '#00f0ff';
+    // Chest hazard chevron / badge
+    ctx.fillStyle = GOLD;
     ctx.beginPath();
-    ctx.moveTo(19, bodyY + 7);
-    ctx.lineTo(22, bodyY + 10);
-    ctx.lineTo(19, bodyY + 13);
-    ctx.lineTo(16, bodyY + 10);
+    ctx.moveTo(23, torsoY + 4);
+    ctx.lineTo(26, torsoY + 7);
+    ctx.lineTo(23, torsoY + 10);
+    ctx.lineTo(20, torsoY + 7);
     ctx.closePath();
     ctx.fill();
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(19, bodyY + 10, 1.5, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillStyle = WHITE;
+    ctx.fillRect(22, torsoY + 6, 2, 2);
 
     // Shoulder Pauldrons
-    ctx.fillStyle = '#12253e';
-    ctx.strokeStyle = '#00f0ff';
-    ctx.lineWidth = 1.4;
-    roundRect(ctx, 7, bodyY - 1, 5, 8, 2);
-    ctx.fill();
-    ctx.stroke();
-    roundRect(ctx, 26, bodyY - 1, 5, 8, 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // If climb: rear cyberdeck center display
-    if (isClimb) {
-      ctx.fillStyle = '#071220';
-      ctx.strokeStyle = '#00f0ff';
-      ctx.lineWidth = 1.6;
-      roundRect(ctx, 13, bodyY + 2, 12, 14, 2);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = '#00f0ff';
-      ctx.fillRect(16, bodyY + 5, 6, 2.5);
-      ctx.fillRect(16, bodyY + 9, 6, 2.5);
-      ctx.fillStyle = '#39ff14';
-      ctx.fillRect(16, bodyY + 13, 6, 2.5);
-    }
-
-    // 4. Arms & Launcher Weapon
-    if (isFire) {
-      // Arms aiming vertically up
-      ctx.strokeStyle = '#0c1b2e';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(12, bodyY + 4); ctx.lineTo(17, bodyY - 7);
-      ctx.moveTo(26, bodyY + 4); ctx.lineTo(21, bodyY - 7);
-      ctx.stroke();
-
-      // Upward launcher barrel
-      ctx.fillStyle = '#1a375a';
-      ctx.strokeStyle = '#00f0ff';
-      ctx.lineWidth = 1.6;
-      roundRect(ctx, 16.5, 2, 5, 17, 2);
-      ctx.fill();
-      ctx.stroke();
-
-      // Plasma energy muzzle flare
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath(); ctx.arc(19, 2, 3.5, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#00f0ff';
-      ctx.beginPath(); ctx.arc(19, 2, 6, 0, Math.PI * 2); ctx.fill();
-    } else if (isClimb) {
-      ctx.strokeStyle = '#0c1b2e';
-      ctx.lineWidth = 3.6;
-      ctx.beginPath();
-      if (frame === 0) {
-        ctx.moveTo(11, bodyY + 4); ctx.lineTo(7, bodyY - 5);
-        ctx.moveTo(27, bodyY + 4); ctx.lineTo(31, bodyY + 6);
-      } else {
-        ctx.moveTo(11, bodyY + 4); ctx.lineTo(7, bodyY + 6);
-        ctx.moveTo(27, bodyY + 4); ctx.lineTo(31, bodyY - 5);
-      }
-      ctx.stroke();
-    } else {
-      // Tactical forward-held weapon
-      ctx.strokeStyle = '#0c1b2e';
-      ctx.lineWidth = 3.6;
-      ctx.beginPath();
-      ctx.moveTo(24, bodyY + 4); ctx.lineTo(30, bodyY + 9);
-      ctx.stroke();
-
-      ctx.fillStyle = '#163152';
-      ctx.strokeStyle = '#00f0ff';
-      ctx.lineWidth = 1.4;
-      roundRect(ctx, 25, bodyY + 5, 10, 8, 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = '#00f0ff';
-      ctx.fillRect(34, bodyY + 7, 3, 4); // muzzle
-    }
-
-    // 5. Head & Cyber Visor Helmet
-    const headY = 9 + bob;
-    ctx.fillStyle = '#071220';
-    ctx.fillRect(16, headY + 5, 6, 4);
-
-    // Helmet dome
-    const helmetGrad = ctx.createRadialGradient(18, headY - 2, 2, 19, headY, 10);
-    helmetGrad.addColorStop(0, '#22436d');
-    helmetGrad.addColorStop(0.7, '#0f233c');
-    helmetGrad.addColorStop(1, '#071220');
-    ctx.fillStyle = helmetGrad;
-    ctx.strokeStyle = '#00f0ff';
+    ctx.fillStyle = JACKET;
+    ctx.strokeStyle = INK;
     ctx.lineWidth = 1.8;
-    ctx.beginPath();
-    ctx.arc(19, headY, 9, 0, Math.PI * 2);
+    roundRect(ctx, 11, torsoY, 5, 8, 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = NEON_CYAN;
+    ctx.fillRect(12, torsoY + 2, 3, 1.5);
+
+    roundRect(ctx, 30, torsoY, 5, 8, 2);
+    ctx.fillStyle = JACKET;
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = NEON_CYAN;
+    ctx.fillRect(31, torsoY + 2, 3, 1.5);
+
+    // Tactical Combat Belt
+    ctx.fillStyle = '#0a101b';
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1.6;
+    roundRect(ctx, 13, torsoY + 15, 20, 4, 1);
     ctx.fill();
     ctx.stroke();
 
-    if (!isClimb) {
-      // Modern Curved Neon Visor
-      ctx.fillStyle = '#00f0ff';
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = '#00f0ff';
-      roundRect(ctx, 13, headY - 3, 13, 6, 3);
+    // Gold cyber buckle
+    ctx.fillStyle = GOLD;
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1.4;
+    roundRect(ctx, 21, torsoY + 14.5, 5, 5, 1);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = INK;
+    ctx.fillRect(22.5, torsoY + 16, 2, 2);
+
+    // Utility hip pouches
+    ctx.fillStyle = '#1f2f45';
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1.4;
+    roundRect(ctx, 11, torsoY + 14, 4, 5, 1);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = GOLD;
+    ctx.fillRect(12.5, torsoY + 15.5, 1.5, 1.5);
+
+    roundRect(ctx, 31, torsoY + 14, 4, 5, 1);
+    ctx.fillStyle = '#1f2f45';
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = GOLD;
+    ctx.fillRect(32.5, torsoY + 15.5, 1.5, 1.5);
+
+    // -------------------------------------------------------------------------
+    // 5. CLIMBING VIEW: TACTICAL BACKPACK CYBERDECK (IF CLIMBING)
+    // -------------------------------------------------------------------------
+    if (isClimb) {
+      // Rear Cyberdeck Chassis
+      ctx.fillStyle = '#0c1524';
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 2;
+      roundRect(ctx, 16, torsoY + 2, 14, 13, 2);
       ctx.fill();
-      ctx.shadowBlur = 0;
-
-      // Specular visor highlight
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(15, headY - 2, 5, 2);
-
-      // Comms headset & antenna
-      ctx.fillStyle = '#00f0ff';
-      ctx.fillRect(9, headY - 2, 2.5, 5);
-      ctx.beginPath();
-      ctx.moveTo(10, headY - 2); ctx.lineTo(8, headY - 7);
-      ctx.strokeStyle = '#00f0ff';
-      ctx.lineWidth = 1.4;
       ctx.stroke();
-      ctx.fillStyle = '#39ff14';
-      ctx.fillRect(7, headY - 9, 2.5, 2.5);
+
+      // Cyberdeck heat exhaust vents
+      ctx.strokeStyle = NEON_CYAN;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(19, torsoY + 5); ctx.lineTo(27, torsoY + 5);
+      ctx.moveTo(19, torsoY + 8); ctx.lineTo(27, torsoY + 8);
+      ctx.stroke();
+
+      // Status LED Bar Graph
+      ctx.fillStyle = NEON_CYAN;
+      ctx.fillRect(18, torsoY + 11, 2.5, 2);
+      ctx.fillStyle = LIME;
+      ctx.fillRect(22, torsoY + 11, 2.5, 2);
+      ctx.fillStyle = SCARF;
+      ctx.fillRect(26, torsoY + 11, 2.5, 2);
+
+      // Scarf knot & short trailing tails on back
+      ctx.fillStyle = SCARF;
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.arc(23, torsoY + 1, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      roundRect(ctx, 19, torsoY + 2, 3, 5, 1);
+      ctx.fill();
+      roundRect(ctx, 24, torsoY + 2, 3, 5, 1);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // -------------------------------------------------------------------------
+    // 6. FRONT HIGH SCARF COLLAR & HERO NECK
+    // -------------------------------------------------------------------------
+    if (!isClimb) {
+      ctx.save();
+      ctx.lineJoin = 'round';
+
+      // Popped crimson collar ring
+      ctx.fillStyle = SCARF;
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 2;
+      roundRect(ctx, 17, torsoY - 2, 12, 6, 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Fold shadow
+      ctx.fillStyle = SCARF_SHADOW;
+      ctx.fillRect(19, torsoY + 2, 8, 2);
+
+      // Gold scarf clasp pin
+      ctx.fillStyle = GOLD;
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 1.2;
+      roundRect(ctx, 21.5, torsoY - 1, 3, 4, 1);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // -------------------------------------------------------------------------
+    // 7. WEAPON & FRONT ARMS
+    // -------------------------------------------------------------------------
+    if (isFire) {
+      // UPWARD FIRING COMBAT STANCE
+      ctx.save();
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+
+      // Arms gripping upward launcher
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 5.5;
+      ctx.beginPath();
+      ctx.moveTo(15, torsoY + 5); ctx.lineTo(20, torsoY - 8);
+      ctx.moveTo(31, torsoY + 5); ctx.lineTo(26, torsoY - 8);
+      ctx.stroke();
+
+      ctx.strokeStyle = JACKET;
+      ctx.lineWidth = 3.6;
+      ctx.beginPath();
+      ctx.moveTo(15, torsoY + 5); ctx.lineTo(20, torsoY - 8);
+      ctx.moveTo(31, torsoY + 5); ctx.lineTo(26, torsoY - 8);
+      ctx.stroke();
+
+      // Combat gloves gripping weapon
+      ctx.fillStyle = WHITE;
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 1.6;
+      roundRect(ctx, 18, torsoY - 10, 5, 4, 1);
+      ctx.fill();
+      ctx.stroke();
+      roundRect(ctx, 24, torsoY - 10, 5, 4, 1);
+      ctx.fill();
+      ctx.stroke();
+
+      // Upward Heavy Plasma Cannon Barrel
+      ctx.fillStyle = GUN_METAL;
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 2;
+      roundRect(ctx, 20.5, 7, 6, 17, 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Glowing cyan plasma core
+      ctx.fillStyle = NEON_CYAN;
+      ctx.fillRect(22, 11, 3, 8);
+      ctx.fillStyle = WHITE;
+      ctx.fillRect(23, 12, 1, 6);
+
+      // Copper heatsink coils
+      ctx.fillStyle = GOLD;
+      ctx.fillRect(20.5, 9, 6, 1.5);
+      ctx.fillRect(20.5, 17, 6, 1.5);
+
+      // DRAMATIC 8-POINT COMIC STARBURST MUZZLE FLASH!
+      const flashX = 23.5;
+      const flashY = 4.5;
+
+      // Outer gold starburst
+      ctx.fillStyle = GOLD;
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      const points = 8;
+      const outerR = 9;
+      const innerR = 4.5;
+      for (let p = 0; p < points * 2; p++) {
+        const rad = (p * Math.PI) / points - Math.PI / 2;
+        const r = p % 2 === 0 ? outerR : innerR;
+        const px = flashX + Math.cos(rad) * r;
+        const py = flashY + Math.sin(rad) * r;
+        if (p === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Inner white star core
+      ctx.fillStyle = WHITE;
+      ctx.beginPath();
+      for (let p = 0; p < points * 2; p++) {
+        const rad = (p * Math.PI) / points - Math.PI / 2;
+        const r = p % 2 === 0 ? 5 : 2.5;
+        const px = flashX + Math.cos(rad) * r;
+        const py = flashY + Math.sin(rad) * r;
+        if (p === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+
+      // Comic action spark particles
+      ctx.fillStyle = NEON_CYAN;
+      ctx.fillRect(flashX - 9, flashY - 2, 2, 2);
+      ctx.fillRect(flashX + 8, flashY - 2, 2, 2);
+      ctx.fillStyle = GOLD;
+      ctx.fillRect(flashX - 5, flashY - 6, 1.5, 1.5);
+      ctx.fillRect(flashX + 5, flashY - 6, 1.5, 1.5);
+      ctx.restore();
+    } else if (isClimb) {
+      // CLIMBING ARMS (ALTERNATING LADDER RUNGS)
+      ctx.save();
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+
+      let leftArmY = frame === 0 ? 12 : 24;
+      let rightArmY = frame === 0 ? 24 : 12;
+
+      // Left Arm
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(13, torsoY + 4); ctx.lineTo(10, leftArmY);
+      ctx.stroke();
+      ctx.strokeStyle = JACKET;
+      ctx.lineWidth = 3.2;
+      ctx.beginPath();
+      ctx.moveTo(13, torsoY + 4); ctx.lineTo(10, leftArmY);
+      ctx.stroke();
+
+      // Right Arm
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(33, torsoY + 4); ctx.lineTo(36, rightArmY);
+      ctx.stroke();
+      ctx.strokeStyle = JACKET;
+      ctx.lineWidth = 3.2;
+      ctx.beginPath();
+      ctx.moveTo(33, torsoY + 4); ctx.lineTo(36, rightArmY);
+      ctx.stroke();
+
+      // Gloved hands gripping rungs
+      ctx.fillStyle = WHITE;
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 1.4;
+      roundRect(ctx, 8, leftArmY - 2, 5, 4, 1);
+      ctx.fill();
+      ctx.stroke();
+      roundRect(ctx, 33, rightArmY - 2, 5, 4, 1);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
     } else {
-      ctx.strokeStyle = '#00f0ff';
+      // READY-TO-SHOOT FORWARD PLASMA HARPOON BUSTER
+      ctx.save();
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+
+      // Front Arm
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(29, torsoY + 4);
+      ctx.lineTo(34, torsoY + 9);
+      ctx.stroke();
+
+      ctx.strokeStyle = JACKET;
+      ctx.lineWidth = 3.2;
+      ctx.beginPath();
+      ctx.moveTo(29, torsoY + 4);
+      ctx.lineTo(34, torsoY + 9);
+      ctx.stroke();
+
+      // Plasma Buster Body
+      ctx.fillStyle = GUN_METAL;
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 2;
+      roundRect(ctx, 30, torsoY + 5, 12, 8, 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Glowing cyan power chamber
+      ctx.fillStyle = NEON_CYAN;
+      ctx.fillRect(33, torsoY + 7, 5, 4);
+      ctx.fillStyle = WHITE;
+      ctx.fillRect(34, torsoY + 8, 2, 2);
+
+      // Gold heatsink rings
+      ctx.fillStyle = GOLD;
+      ctx.fillRect(35, torsoY + 5, 1.5, 8);
+      ctx.fillRect(38, torsoY + 5, 1.5, 8);
+
+      // Muzzle nozzle with ready spark
+      ctx.fillStyle = INK;
+      ctx.fillRect(42, torsoY + 6.5, 2.5, 5);
+      ctx.fillStyle = NEON_CYAN;
+      ctx.fillRect(43, torsoY + 7.5, 2, 3);
+      ctx.restore();
+    }
+
+    // -------------------------------------------------------------------------
+    // 8. HEAD, SPIKY COMIC HAIR, CYBER VISOR & COMMS
+    // -------------------------------------------------------------------------
+    const headY = 12 + headBob;
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
+    if (isClimb) {
+      // REAR HEAD VIEW (SPIKY CYAN HAIR FANNING OUTWARD)
+      // Base head volume
+      ctx.fillStyle = HAIR_SHADOW;
+      ctx.beginPath();
+      ctx.arc(23, headY + 2, 8, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Spikes fanning from back of head
+      ctx.fillStyle = HAIR_CYAN;
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(15, headY + 7);
+      ctx.lineTo(11, headY + 1); // left low flare
+      ctx.lineTo(15, headY - 1);
+      ctx.lineTo(14, headY - 6); // left high spike
+      ctx.lineTo(19, headY - 4);
+      ctx.lineTo(23, headY - 9); // center crown spike
+      ctx.lineTo(27, headY - 4);
+      ctx.lineTo(32, headY - 6); // right high spike
+      ctx.lineTo(31, headY - 1);
+      ctx.lineTo(35, headY + 1); // right low flare
+      ctx.lineTo(31, headY + 7);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // White comic gleams on back spikes
+      ctx.strokeStyle = HAIR_SHINE;
       ctx.lineWidth = 1.4;
       ctx.beginPath();
-      ctx.moveTo(15, headY - 3); ctx.lineTo(23, headY - 3);
-      ctx.moveTo(14, headY); ctx.lineTo(24, headY);
+      ctx.moveTo(16, headY - 4); ctx.lineTo(18, headY - 3);
+      ctx.moveTo(23, headY - 7); ctx.lineTo(23, headY - 4);
+      ctx.moveTo(30, headY - 4); ctx.lineTo(28, headY - 3);
+      ctx.stroke();
+    } else {
+      // 3/4 HERO COMIC PORTRAIT
+      // Manga Skin & Jawline
+      ctx.fillStyle = SKIN;
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(18, headY - 1);
+      ctx.lineTo(18, headY + 5); // ear
+      ctx.lineTo(22, headY + 8); // jawline
+      ctx.lineTo(26, headY + 8); // chin
+      ctx.lineTo(28, headY + 3); // cheek
+      ctx.lineTo(28, headY - 1);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Warm cel-shadow under jaw
+      ctx.fillStyle = SKIN_SHADOW;
+      ctx.beginPath();
+      ctx.moveTo(18, headY + 4);
+      ctx.lineTo(22, headY + 8);
+      ctx.lineTo(26, headY + 8);
+      ctx.lineTo(25, headY + 5);
+      ctx.closePath();
+      ctx.fill();
+
+      // Headset Earpiece & Comms Antenna
+      ctx.fillStyle = '#0a101b';
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 1.4;
+      roundRect(ctx, 16, headY + 1, 3.5, 6, 1);
+      ctx.fill();
+      ctx.stroke();
+
+      // Antenna rising to green LED
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(17.5, headY + 1);
+      ctx.lineTo(16, headY - 5);
+      ctx.stroke();
+      ctx.fillStyle = LIME;
+      ctx.beginPath();
+      ctx.arc(16, headY - 6, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Cyber Visor / Goggles (Glowing Hot Pink with // reflection)
+      ctx.fillStyle = VISOR_PINK;
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 2;
+      roundRect(ctx, 20, headY - 2, 12, 6, 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Double white specular reflection slashes //
+      ctx.strokeStyle = WHITE;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(23, headY + 2.5); ctx.lineTo(26, headY - 1);
+      ctx.moveTo(27, headY + 2.5); ctx.lineTo(30, headY - 1);
+      ctx.stroke();
+
+      // DYNAMIC SPIKY COMIC HAIR
+      ctx.fillStyle = HAIR_CYAN;
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(17, headY + 1);
+      ctx.lineTo(11, headY - 1); // low rear flare
+      ctx.lineTo(14, headY - 4);
+      ctx.lineTo(11, headY - 7); // mid rear spike
+      ctx.lineTo(16, headY - 6);
+      ctx.lineTo(15, headY - 11); // high crest spike
+      ctx.lineTo(21, headY - 7);
+      ctx.lineTo(23, headY - 12); // main apex spike
+      ctx.lineTo(26, headY - 7);
+      ctx.lineTo(29, headY - 10); // front top spike
+      ctx.lineTo(30, headY - 5);
+      ctx.lineTo(34, headY - 3); // front brow swoop
+      ctx.lineTo(30, headY - 1);
+      ctx.lineTo(29, headY + 2); // sideburn lock
+      ctx.lineTo(27, headY - 1);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Underside hair shadow
+      ctx.fillStyle = HAIR_SHADOW;
+      ctx.beginPath();
+      ctx.moveTo(14, headY - 4);
+      ctx.lineTo(11, headY - 7);
+      ctx.lineTo(16, headY - 6);
+      ctx.closePath();
+      ctx.fill();
+
+      // Specular white comic gleam streaks along crests
+      ctx.strokeStyle = HAIR_SHINE;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(16, headY - 9); ctx.lineTo(18, headY - 7);
+      ctx.moveTo(23, headY - 10); ctx.lineTo(24, headY - 7);
+      ctx.moveTo(28, headY - 8); ctx.lineTo(29, headY - 6);
       ctx.stroke();
     }
+    ctx.restore();
   };
 
-  // Bake walk frames
+  // Bake walk frames (0 to 3)
   for (let i = 0; i < 4; i++) {
     const ctx = canvas(scene, `hero_walk_${i}`, width, height);
     drawHero(ctx, 'walk', i);
     refresh(scene, `hero_walk_${i}`);
   }
 
-  // Bake jump frame!
+  // Bake jump frame (athletic airborne kick pose + dual thruster jets)
   const jumpCtx = canvas(scene, 'hero_jump', width, height);
   drawHero(jumpCtx, 'jump', 0);
   refresh(scene, 'hero_jump');
 
-  // Bake fire frame
+  // Bake fire frame (recoil power stance + upward launcher + starburst flash)
   const fireCtx = canvas(scene, 'hero_fire', width, height);
   drawHero(fireCtx, 'fire', 0);
   refresh(scene, 'hero_fire');
 
-  // Bake climb frames
+  // Bake climb frames (0 and 1)
   for (let i = 0; i < 2; i++) {
     const ctx = canvas(scene, `hero_climb_${i}`, width, height);
     drawHero(ctx, 'climb', i);
@@ -356,21 +929,102 @@ function bakeHeroTextures(scene: Phaser.Scene): void {
   drawHero(heroCtx, 'walk', 0);
   refresh(scene, 'hero');
 
-  // Mini hero life icon for HUD (20x24)
-  const lifeCtx = canvas(scene, 'hero_life', 20, 24);
-  lifeCtx.fillStyle = '#081424';
-  lifeCtx.strokeStyle = '#00f0ff';
-  lifeCtx.lineWidth = 1.6;
-  roundRect(lifeCtx, 3, 2, 14, 14, 4);
+  // ---------------------------------------------------------------------------
+  // POLISHED COMIC CHARACTER BUST STICKER BADGE FOR HUD (24x26)
+  // ---------------------------------------------------------------------------
+  const lifeCtx = canvas(scene, 'hero_life', 24, 26);
+
+  // Badge background with 2px solid comic border
+  lifeCtx.fillStyle = '#0a1424';
+  lifeCtx.strokeStyle = INK;
+  lifeCtx.lineWidth = 2;
+  roundRect(lifeCtx, 1, 1, 22, 24, 4);
   lifeCtx.fill();
   lifeCtx.stroke();
-  lifeCtx.fillStyle = '#00f0ff';
-  lifeCtx.fillRect(6, 6, 8, 4);
-  lifeCtx.fillStyle = '#ffffff';
-  lifeCtx.fillRect(7, 7, 3, 2);
-  lifeCtx.fillStyle = '#00f0ff';
-  roundRect(lifeCtx, 5, 17, 10, 5, 1);
+
+  // Cyan badge border inner rim
+  lifeCtx.strokeStyle = NEON_CYAN;
+  lifeCtx.lineWidth = 1;
+  roundRect(lifeCtx, 2.5, 2.5, 19, 21, 3);
+  lifeCtx.stroke();
+
+  // Skin & jaw
+  lifeCtx.fillStyle = SKIN;
+  lifeCtx.strokeStyle = INK;
+  lifeCtx.lineWidth = 1.4;
+  lifeCtx.beginPath();
+  lifeCtx.moveTo(8, 10);
+  lifeCtx.lineTo(8, 14);
+  lifeCtx.lineTo(12, 17);
+  lifeCtx.lineTo(16, 17);
+  lifeCtx.lineTo(18, 13);
+  lifeCtx.lineTo(18, 10);
+  lifeCtx.closePath();
   lifeCtx.fill();
+  lifeCtx.stroke();
+
+  // Cyber Visor (Hot Pink with // gleam)
+  lifeCtx.fillStyle = VISOR_PINK;
+  lifeCtx.strokeStyle = INK;
+  lifeCtx.lineWidth = 1.4;
+  roundRect(lifeCtx, 9, 10, 9, 5, 1.5);
+  lifeCtx.fill();
+  lifeCtx.stroke();
+  lifeCtx.strokeStyle = WHITE;
+  lifeCtx.lineWidth = 1;
+  lifeCtx.beginPath();
+  lifeCtx.moveTo(12, 13.5); lifeCtx.lineTo(14, 11);
+  lifeCtx.moveTo(15, 13.5); lifeCtx.lineTo(17, 11);
+  lifeCtx.stroke();
+
+  // Spiky Cyan Hair
+  lifeCtx.fillStyle = HAIR_CYAN;
+  lifeCtx.strokeStyle = INK;
+  lifeCtx.lineWidth = 1.6;
+  lifeCtx.beginPath();
+  lifeCtx.moveTo(6, 11);
+  lifeCtx.lineTo(4, 7);
+  lifeCtx.lineTo(8, 6);
+  lifeCtx.lineTo(8, 2);
+  lifeCtx.lineTo(13, 5);
+  lifeCtx.lineTo(16, 2);
+  lifeCtx.lineTo(18, 5);
+  lifeCtx.lineTo(21, 6);
+  lifeCtx.lineTo(19, 10);
+  lifeCtx.closePath();
+  lifeCtx.fill();
+  lifeCtx.stroke();
+
+  // White hair shine
+  lifeCtx.strokeStyle = WHITE;
+  lifeCtx.lineWidth = 1;
+  lifeCtx.beginPath();
+  lifeCtx.moveTo(9, 3.5); lifeCtx.lineTo(11, 4.5);
+  lifeCtx.moveTo(15, 3.5); lifeCtx.lineTo(16, 4.5);
+  lifeCtx.stroke();
+
+  // Popped Crimson Scarf Collar
+  lifeCtx.fillStyle = SCARF;
+  lifeCtx.strokeStyle = INK;
+  lifeCtx.lineWidth = 1.4;
+  roundRect(lifeCtx, 7, 16.5, 10, 4.5, 1.5);
+  lifeCtx.fill();
+  lifeCtx.stroke();
+
+  // Gold clasp pin
+  lifeCtx.fillStyle = GOLD;
+  lifeCtx.fillRect(11, 17.5, 2, 2.5);
+
+  // Midnight navy jacket base with cyan rim
+  lifeCtx.fillStyle = JACKET;
+  lifeCtx.strokeStyle = INK;
+  lifeCtx.lineWidth = 1.4;
+  roundRect(lifeCtx, 5, 20.5, 14, 4, 1);
+  lifeCtx.fill();
+  lifeCtx.stroke();
+  lifeCtx.fillStyle = NEON_CYAN;
+  lifeCtx.fillRect(10, 20.5, 4, 1.2);
+
   refresh(scene, 'hero_life');
 }
 
@@ -737,6 +1391,52 @@ function bakeWeaponTextures(scene: Phaser.Scene): void {
   beam.fillRect(5, 4, 6, 3);
   beam.fillRect(5, 20, 6, 3);
   refresh(scene, 'wire_beam');
+
+  // 5. Vertical "PATCH" Bullet (22x54) - Word read in vertical
+  const patch = canvas(scene, 'bullet_patch', 22, 54);
+  // Dark capsule container with neon lime cyber border
+  patch.fillStyle = '#06121fee';
+  patch.strokeStyle = '#39ff14';
+  patch.lineWidth = 2;
+  roundRect(patch, 2, 2, 18, 48, 4);
+  patch.fill();
+  patch.stroke();
+
+  // Inner glow rim
+  patch.strokeStyle = 'rgba(57, 255, 20, 0.4)';
+  patch.lineWidth = 1;
+  roundRect(patch, 4, 4, 14, 44, 2);
+  patch.stroke();
+
+  // Vertical "PATCH" typography - P, A, T, C, H
+  const letters = ['P', 'A', 'T', 'C', 'H'];
+  patch.font = 'bold 9px "Share Tech Mono", monospace';
+  patch.textAlign = 'center';
+  patch.textBaseline = 'middle';
+  patch.fillStyle = '#ffffff';
+  patch.shadowColor = '#39ff14';
+  patch.shadowBlur = 6;
+
+  letters.forEach((char, idx) => {
+    const ly = 9 + idx * 8.5;
+    patch.fillText(char, 11, ly);
+  });
+  patch.shadowBlur = 0;
+
+  // Bottom thruster exhaust nozzle & flame
+  patch.fillStyle = '#39ff14';
+  patch.fillRect(6, 47, 10, 3);
+  patch.fillStyle = '#ffffff';
+  patch.fillRect(8, 48, 6, 2);
+
+  patch.fillStyle = '#00f0ff';
+  patch.beginPath();
+  patch.moveTo(7, 50);
+  patch.lineTo(11, 54);
+  patch.lineTo(15, 50);
+  patch.closePath();
+  patch.fill();
+  refresh(scene, 'bullet_patch');
 }
 
 // ---------------------------------------------------------------------------
@@ -753,6 +1453,8 @@ function bakePowerUpTextures(scene: Phaser.Scene): void {
     { key: 'pickup_double', color: '#ffd700', type: 'double' },
     { key: 'pickup_triple', color: '#ff922b', type: 'triple' },
     { key: 'pickup_sticky', color: '#f72585', type: 'sticky' },
+    { key: 'pickup_patch', color: '#39ff14', type: 'patch' },
+    { key: 'pickup_firewall', color: '#c77dff', type: 'firewall' },
   ] as const;
 
   for (const item of pickups) {
@@ -856,6 +1558,31 @@ function bakePowerUpTextures(scene: Phaser.Scene): void {
       ctx.lineTo(cx, cy + 8);
       ctx.lineTo(cx + 7, cy + 4);
       ctx.stroke();
+    } else if (item.type === 'patch') {
+      // Microchip / Patch pill with vertical text P
+      ctx.fillStyle = item.color;
+      roundRect(ctx, cx - 8, cy - 10, 16, 20, 3);
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 8px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('PTCH', cx, cy);
+    } else if (item.type === 'firewall') {
+      // Server Firewall shield dome
+      ctx.strokeStyle = item.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 9, Math.PI, 0);
+      ctx.lineTo(cx + 7, cy + 8);
+      ctx.lineTo(cx - 7, cy + 8);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(cx - 2, cy + 1, 4, 5);
     }
 
     refresh(scene, item.key);
@@ -1411,8 +2138,8 @@ export function bakeTextures(scene: Phaser.Scene): void {
   const required = [
     'hero', 'hero_walk_0', 'hero_walk_1', 'hero_walk_2', 'hero_walk_3', 'hero_jump', 'hero_fire', 'hero_climb_0', 'hero_climb_1', 'hero_life',
     'orb1', 'orb2', 'orb3', 'orb4', 'orb_tier_4',
-    'harpoon-rj45', 'harpoon-ai', 'harpoon-devops', 'wire_beam',
-    'pickup_freeze', 'pickup_shield', 'pickup_double', 'pickup_triple', 'pickup_sticky',
+    'harpoon-rj45', 'harpoon-ai', 'harpoon-devops', 'wire_beam', 'bullet_patch',
+    'pickup_freeze', 'pickup_shield', 'pickup_double', 'pickup_triple', 'pickup_sticky', 'pickup_patch', 'pickup_firewall',
     'platform-solid', 'platform-breakable', 'ladder-rung',
     'cybersec-background', 'ai-background', 'devops-background',
     'particle', 'shockwave_ring',

@@ -4,21 +4,23 @@ import type { WorldId, GameMode, Tier } from '../config/constants';
 import { WORLDS } from '../config/themes';
 import { getLevel } from '../config/levels';
 import type { LevelPlatform, LevelOrb, BossObjective, LevelLayout } from '../config/levels';
-import { Player } from '../entities/Player';
+import { Player, type ActiveLadderBounds } from '../entities/Player';
 import { Orb } from '../entities/Orb';
 import { PowerUp } from '../entities/PowerUp';
 import type { PowerKind } from '../entities/PowerUp';
 import { SynthAudio } from '../audio/SynthAudio';
 import { Harpoon } from '../entities/Harpoon';
 import { ServerRack } from '../entities/ServerRack';
+import { PatchBullet } from '../entities/PatchBullet';
 import { setHighScore } from '../utils/storage';
+import { Logger } from '../utils/logger';
 
 export class GameScene extends Phaser.Scene {
   private world: WorldId = 'cybersec';
   private mode: GameMode = 'campaign';
   private stage = 1;
   private score = 0;
-  private lives = 3;
+  private lives = 5;
   private remaining = 75;
   private player!: Player;
   private orbs: Orb[] = [];
@@ -27,7 +29,10 @@ export class GameScene extends Phaser.Scene {
   private platformObjects: Phaser.GameObjects.TileSprite[] = [];
   private ladders: Phaser.GameObjects.TileSprite[] = [];
   private servers: ServerRack[] = [];
-  private weapon: 'standard' | 'double' | 'triple' | 'sticky' = 'standard';
+  private serverLedges: Phaser.GameObjects.Rectangle[] = [];
+  private weapon: 'standard' | 'double' | 'triple' | 'sticky' | 'patch' = 'standard';
+  private savedHarpoonWeapon: 'standard' | 'double' | 'triple' | 'sticky' = 'standard';
+  private patchBullets: PatchBullet[] = [];
   private freezeUntil = 0;
   private freezeStart = 0;
   private clearing = false;
@@ -76,15 +81,16 @@ export class GameScene extends Phaser.Scene {
   init(data: { world: WorldId; mode: GameMode }): void {
     this.world = data.world ?? 'cybersec';
     this.mode = data.mode ?? 'campaign';
-    this.lives = 3;
+    this.lives = 5;
     this.score = 0;
     this.stage = 1;
     this.gameOverActive = false;
     this.comboCount = 0;
+    Logger.info(`Game initialized: Sector ${this.world}, Protocol ${this.mode}`);
   }
 
   create(): void {
-    this.lives = 3;
+    this.lives = 5;
     this.score = 0;
     this.stage = 1;
     this.weapon = 'standard';
@@ -137,7 +143,13 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-SPACE', () => this.fire());
     this.input.keyboard?.on('keydown-M', () => this.toggleMusic());
     this.input.keyboard?.on('keydown-R', () => this.resetCurrentStage());
+    this.input.keyboard?.on('keydown-V', () => this.toggleAimMode());
     this.input.keyboard?.on('keydown-T', () => this.toggleAimMode());
+    this.input.keyboard?.on('keydown-Q', () => this.toggleWeapon());
+    this.input.keyboard?.on('keydown-E', () => this.toggleWeapon());
+    this.input.keyboard?.on('keydown-X', () => this.toggleWeapon());
+    this.input.keyboard?.on('keydown-L', () => (this.scene.get('UI') as any)?.toggleLogsModal());
+    this.input.keyboard?.on('keydown-BACKTICK', () => (this.scene.get('UI') as any)?.toggleLogsModal());
 
     this.keys = {
       left: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A),
@@ -156,6 +168,7 @@ export class GameScene extends Phaser.Scene {
     this.audio.startMusic(this.world, true);
     this.scene.launch('UI');
     this.scene.launch('Touch');
+    Logger.info(`Stage 1 loaded. Operative ready with 5 nodes.`);
   }
 
   private drawArena(worldW: number, worldH: number, floorY: number): void {
@@ -266,6 +279,10 @@ export class GameScene extends Phaser.Scene {
     this.ladders = [];
     this.servers.forEach((server) => server.destroy());
     this.servers = [];
+    this.serverLedges.forEach((ledge) => ledge.destroy());
+    this.serverLedges = [];
+    this.patchBullets.forEach((bullet) => bullet.destroy());
+    this.patchBullets = [];
     this.harpoon.clear();
 
     if (this.bossSprite) {
@@ -373,6 +390,23 @@ export class GameScene extends Phaser.Scene {
       for (const s of layout.servers) {
         const rack = new ServerRack(this, s.x, s.hp ?? 4, s.label ?? 'SRV-01', floorY);
         this.servers.push(rack);
+
+        // Solid walkable top ledge so hero can jump up and walk on top of servers
+        const ledge = this.add.rectangle(s.x, rack.y - 26, 60, 8, 0x000000, 0);
+        this.physics.add.existing(ledge, true);
+        const ledgeBody = ledge.body as Phaser.Physics.Arcade.StaticBody;
+        ledgeBody.checkCollision.down = false;
+        ledgeBody.checkCollision.left = false;
+        ledgeBody.checkCollision.right = false;
+        ledgeBody.checkCollision.up = true;
+        this.physics.add.collider(
+          this.player,
+          ledge,
+          undefined,
+          () => this.player.state !== 'CLIMBING',
+          this,
+        );
+        this.serverLedges.push(ledge);
       }
     }
 
@@ -641,10 +675,24 @@ export class GameScene extends Phaser.Scene {
       this.player.setFlipX(false);
     }
 
+    // 1. If PATCH weapon is active: shoot high-velocity vertical "PATCH" bullet!
+    if (this.weapon === 'patch') {
+      const activeBullets = this.patchBullets.filter((b) => b.active);
+      if (activeBullets.length >= 4) return;
+
+      const bullet = new PatchBullet(this, this.player.x, this.player.y - 18, angleRad);
+      this.patchBullets.push(bullet);
+      this.player.firePose(this.time.now);
+      this.audio.unlock();
+      this.audio.playPatchShoot();
+      return;
+    }
+
+    // 2. Otherwise shoot Harpoon (unlimited fixed on roof!):
     this.harpoon.fire(
       this.player.x,
       this.player.getBounds().bottom,
-      mode,
+      mode === 'patch' ? 'standard' : mode,
       tipTexture,
       WORLDS[this.world].accent,
       angleRad,
@@ -652,6 +700,46 @@ export class GameScene extends Phaser.Scene {
     this.player.firePose(this.time.now);
     this.audio.unlock();
     this.audio.playShoot();
+  }
+
+  // Toggle between Harpoon and PATCH Blaster weapons
+  public toggleWeapon(): 'harpoon' | 'patch' {
+    if (this.weapon === 'patch') {
+      this.weapon = this.savedHarpoonWeapon;
+    } else {
+      this.savedHarpoonWeapon = this.weapon;
+      this.weapon = 'patch';
+    }
+    this.audio.playWeaponSwitch();
+    this.scene.get('UI').events.emit('hud', {
+      score: this.score,
+      lives: this.lives,
+      time: Math.ceil(this.remaining),
+      weapon: this.weapon.toUpperCase(),
+      aimMode: this.aimMode,
+    });
+    const label =
+      this.weapon === 'patch'
+        ? 'WEAPON: [ 💊 PATCH BLASTER ]'
+        : `WEAPON: [ ⚡ HARPOON (${this.weapon.toUpperCase()}) ]`;
+    const toast = this.add
+      .text(this.player.x, this.player.y - 45, label, {
+        fontFamily: "'Orbitron', sans-serif",
+        fontSize: '11px',
+        color: this.weapon === 'patch' ? '#39ff14' : '#00f0ff',
+        backgroundColor: '#0a1424cc',
+        padding: { x: 7, y: 3 },
+      })
+      .setOrigin(0.5)
+      .setDepth(45);
+    this.tweens.add({
+      targets: toast,
+      y: toast.y - 25,
+      alpha: 0,
+      duration: 650,
+      onComplete: () => toast.destroy(),
+    });
+    return this.weapon === 'patch' ? 'patch' : 'harpoon';
   }
 
   // Reset Current Level Option
@@ -686,8 +774,8 @@ export class GameScene extends Phaser.Scene {
 
   update(time: number, delta: number): void {
     if (this.gameOverActive) return;
-
-    this.harpoon.update(delta, this.weapon === 'sticky', time);
+    try {
+      this.harpoon.update(delta, this.weapon === 'sticky', time);
 
     const movingLeft = this.keys.left.isDown || this.keys.leftArrow.isDown;
     const movingRight = this.keys.right.isDown || this.keys.rightArrow.isDown;
@@ -702,27 +790,31 @@ export class GameScene extends Phaser.Scene {
     if (climbingUp && this.player.state === 'CLIMBING') this.player.climb(-1);
     else if (climbingDown && this.player.state === 'CLIMBING') this.player.climb(1);
 
-    // Ladder proximity & alignment
-    let ladderX: number | undefined;
+    // Ladder proximity & alignment with strict height boundaries
+    let activeLadder: ActiveLadderBounds | undefined;
     const playerBounds = this.player.getBounds();
     for (const ladder of this.ladders) {
       const bounds = ladder.getBounds();
-      const closeToLadder = Math.abs(this.player.x - bounds.centerX) <= 26;
+      const closeToLadder = Math.abs(this.player.x - bounds.centerX) <= 24;
       const overlapsLadderHeight =
-        playerBounds.bottom >= bounds.top - 8 && playerBounds.top <= bounds.bottom + 8;
+        playerBounds.bottom >= bounds.top - 10 && playerBounds.top <= bounds.bottom + 10;
       if (closeToLadder && overlapsLadderHeight) {
-        ladderX = bounds.centerX;
+        activeLadder = {
+          x: bounds.centerX,
+          top: bounds.top,
+          bottom: bounds.bottom,
+        };
         break;
       }
     }
-    this.player.updateLadder(ladderX, climbingUp, climbingDown, movingLeft, movingRight);
+    this.player.updateLadder(activeLadder, climbingUp, climbingDown, movingLeft, movingRight);
 
     // Hero Jump Mechanics (W / Up Arrow or mobile touch jump)
     const justPressedJump =
       Phaser.Input.Keyboard.JustDown(this.keys.up) ||
       Phaser.Input.Keyboard.JustDown(this.keys.upArrow);
     if (justPressedJump && this.player.state !== 'CLIMBING') {
-      const nearLadder = ladderX !== undefined && Math.abs(this.player.x - ladderX) <= 18;
+      const nearLadder = activeLadder !== undefined && Math.abs(this.player.x - activeLadder.x) <= 18;
       if (!nearLadder || movingLeft || movingRight) {
         const dir = movingLeft ? -1 : movingRight ? 1 : 0;
         if (this.player.jump(dir)) {
@@ -785,6 +877,154 @@ export class GameScene extends Phaser.Scene {
       this.freezeText?.setText(`❄ TIME FREEZE ACTIVE // ${remainingSeconds}s`);
     }
 
+    // Update active PATCH bullets & Collisions
+    const worldWidth = this.physics.world.bounds.width || this.scale.width;
+    for (let bIdx = this.patchBullets.length - 1; bIdx >= 0; bIdx--) {
+      const bullet = this.patchBullets[bIdx];
+      if (!bullet.active) continue;
+      bullet.updateTrail();
+
+      // Check boundary
+      if (bullet.y <= 0 || bullet.x <= 0 || bullet.x >= worldWidth) {
+        bullet.destroy();
+        this.patchBullets.splice(bIdx, 1);
+        continue;
+      }
+
+      // 1. Hit Boss
+      if (this.bossSprite?.active && this.bossHp > 0) {
+        if (Phaser.Geom.Intersects.RectangleToRectangle(bullet.getBounds(), this.bossSprite.getBounds())) {
+          bullet.destroy();
+          this.patchBullets.splice(bIdx, 1);
+          this.damageBoss(3);
+          const hitText = this.add
+            .text(bullet.x, bullet.y - 15, 'HOTFIX! -3 HP', {
+              fontFamily: "'Orbitron', sans-serif",
+              fontSize: '11px',
+              color: '#39ff14',
+              fontStyle: 'bold',
+            })
+            .setOrigin(0.5)
+            .setDepth(40);
+          this.tweens.add({
+            targets: hitText,
+            y: hitText.y - 25,
+            alpha: 0,
+            duration: 500,
+            onComplete: () => hitText.destroy(),
+          });
+          continue;
+        }
+      }
+
+      // 2. Hit Server Rack: REPAIR or FORTIFY!
+      let serverHit = false;
+      for (const server of this.servers) {
+        if (server.isDestroyed) continue;
+        if (Phaser.Geom.Intersects.RectangleToRectangle(bullet.getBounds(), server.getBoundsRect())) {
+          bullet.destroy();
+          this.patchBullets.splice(bIdx, 1);
+          serverHit = true;
+          if (server.hp < server.maxHp) {
+            server.repair(1);
+            this.audio.playServerHeal();
+            const text = this.add
+              .text(server.x, server.y - 45, '+1 HP HOTFIX PATCHED!', {
+                fontFamily: "'Orbitron', sans-serif",
+                fontSize: '11px',
+                color: '#39ff14',
+                fontStyle: 'bold',
+              })
+              .setOrigin(0.5)
+              .setDepth(35);
+            this.tweens.add({
+              targets: text,
+              y: text.y - 25,
+              alpha: 0,
+              duration: 600,
+              onComplete: () => text.destroy(),
+            });
+          } else {
+            server.grantShield(1);
+            this.audio.playServerShield();
+            const text = this.add
+              .text(server.x, server.y - 45, 'FIREWALL SHIELD +1!', {
+                fontFamily: "'Orbitron', sans-serif",
+                fontSize: '11px',
+                color: '#c77dff',
+                fontStyle: 'bold',
+              })
+              .setOrigin(0.5)
+              .setDepth(35);
+            this.tweens.add({
+              targets: text,
+              y: text.y - 25,
+              alpha: 0,
+              duration: 600,
+              onComplete: () => text.destroy(),
+            });
+          }
+          break;
+        }
+      }
+      if (serverHit) continue;
+
+      // 3. Hit Platforms
+      let platformHit = false;
+      for (let pIdx = this.platformObjects.length - 1; pIdx >= 0; pIdx--) {
+        const pObj = this.platformObjects[pIdx];
+        if (!pObj.active) continue;
+        const pData = pObj.getData('platform') as LevelPlatform | undefined;
+        if (Phaser.Geom.Intersects.RectangleToRectangle(bullet.getBounds(), pObj.getBounds())) {
+          bullet.destroy();
+          this.patchBullets.splice(bIdx, 1);
+          platformHit = true;
+          if (pData?.breakable) {
+            this.audio.playBlockBreak();
+            this.score += 250;
+            pObj.destroy();
+            this.platformObjects.splice(pIdx, 1);
+            this.platforms = this.platforms.filter((p) => p !== pData);
+          }
+          break;
+        }
+      }
+      if (platformHit) continue;
+
+      // 4. Hit Threat Orbs!
+      let orbHit = false;
+      for (let i = this.orbs.length - 1; i >= 0; i--) {
+        const orb = this.orbs[i];
+        if (!orb.active) continue;
+        const radius = TIER[orb.tier].radius;
+        const dist = Math.hypot(bullet.x - orb.x, bullet.y - orb.y);
+        if (dist <= radius + 10) {
+          bullet.destroy();
+          this.patchBullets.splice(bIdx, 1);
+          this.popOrb(orb, i);
+          orbHit = true;
+          const patchText = this.add
+            .text(orb.x, orb.y - 20, 'PATCHED!', {
+              fontFamily: "'Orbitron', monospace",
+              fontSize: '12px',
+              color: '#39ff14',
+              fontStyle: 'bold',
+            })
+            .setOrigin(0.5)
+            .setDepth(35);
+          this.tweens.add({
+            targets: patchText,
+            y: patchText.y - 25,
+            alpha: 0,
+            duration: 500,
+            onComplete: () => patchText.destroy(),
+          });
+          break;
+        }
+      }
+      if (orbHit) continue;
+    }
+
     // Check Harpoon Collisions with Boss Objective
     if (this.bossSprite && this.bossSprite.active && this.bossHp > 0) {
       const bBounds = this.bossSprite.getBounds();
@@ -800,18 +1040,21 @@ export class GameScene extends Phaser.Scene {
     // Orb updates & Collisions
     for (let i = this.orbs.length - 1; i >= 0; i--) {
       const orb = this.orbs[i];
-      if (!orb.active) continue;
+      if (!orb.active || !orb.body) continue;
       orb.updateBounce();
       const radius = TIER[orb.tier].radius;
 
       // Check Harpoon Collisions with Orbs (using multi-directional beam test)
+      let orbPopped = false;
       for (const active of this.harpoon.activeWires) {
         if (this.harpoon.intersectsOrb(active, orb.x, orb.y, radius)) {
           this.harpoon.hitActive(active);
           this.popOrb(orb, i);
+          orbPopped = true;
           break;
         }
       }
+      if (orbPopped || !orb.active || !orb.body) continue;
 
       // Check Server Rack Impacts from Orbs
       for (const server of this.servers) {
@@ -830,9 +1073,11 @@ export class GameScene extends Phaser.Scene {
           orb.y + radius >= sBounds.top &&
           orb.y - radius <= sBounds.bottom
         ) {
-          // Bounce orb upward
-          orb.y = sBounds.top - radius;
-          orb.bounceUp();
+          // Bounce orb upward safely
+          if (orb.active && orb.body) {
+            orb.y = sBounds.top - radius;
+            orb.bounceUp();
+          }
 
           if (server.takeDamage(1)) {
             this.audio.playServerHit();
@@ -872,6 +1117,9 @@ export class GameScene extends Phaser.Scene {
       // Check Player Collisions with Orbs
       if (
         orb.active &&
+        orb.body &&
+        this.player.active &&
+        this.player.body &&
         Phaser.Geom.Intersects.RectangleToRectangle(orb.getBounds(), this.player.getBounds()) &&
         !this.player.isInvulnerable(time)
       ) {
@@ -923,7 +1171,11 @@ export class GameScene extends Phaser.Scene {
       this.servers.length > 0 &&
       this.servers.every((s) => s.isDestroyed)
     ) {
-      this.loseLife();
+      if (!this.gameOverActive) {
+        Logger.warn('All cybersec server clusters offline! Mission failure triggered.');
+        this.lives = 0;
+        this.gameOver();
+      }
       return;
     }
 
@@ -975,13 +1227,10 @@ export class GameScene extends Phaser.Scene {
             this.platformObjects.splice(pIdx, 1);
             this.platforms = this.platforms.filter((p) => p !== pData);
           } else {
-            // Solid platform: latch if sticky, or destroy harpoon
-            if (this.weapon === 'sticky') {
-              if (!active.stickyUntil) {
-                active.stickyUntil = time + 3500;
-              }
-            } else {
-              this.harpoon.hitActive(active);
+            // Solid platform: anchors firmly as an unlimited fixed harpoon!
+            if (!active.isFixed) {
+              active.isFixed = true;
+              active.fixedAt = time;
             }
           }
           break;
@@ -1012,7 +1261,14 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Time expiry check
-    if (this.remaining <= 0) this.loseLife();
+    if (this.remaining <= 0) {
+      if (!this.gameOverActive) {
+        Logger.warn('Mission timer expired! Mission failure triggered.');
+        this.lives = 0;
+        this.gameOver();
+      }
+      return;
+    }
 
     // Stage clear check (boss destroyed or all orbs popped)
     if (!this.clearing) {
@@ -1069,9 +1325,12 @@ export class GameScene extends Phaser.Scene {
         this.shieldAura = undefined;
       }
     }
+  } catch (err) {
+    Logger.error(`Error in GameScene.update(): ${err}`, { stack: (err as any)?.stack });
   }
+}
 
-  private popOrb(orb: Orb, index: number): void {
+private popOrb(orb: Orb, index: number): void {
     const tier = orb.tier;
     const now = this.time.now;
 
@@ -1202,7 +1461,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private spawnPickup(x: number, y: number): void {
-    const kinds: PowerKind[] = ['freeze', 'shield', 'double', 'triple', 'sticky'];
+    const kinds: PowerKind[] = ['freeze', 'shield', 'double', 'triple', 'sticky', 'patch', 'firewall'];
     const pickup = new PowerUp(this, x, y, kinds[Math.floor(Math.random() * kinds.length)]);
     this.pickups.push(pickup);
   }
@@ -1213,7 +1472,9 @@ export class GameScene extends Phaser.Scene {
       shield: '+500 WAF SHIELD ACTIVE',
       double: '+500 DUAL HARPOON',
       triple: '+500 TRIPLE HARPOON',
-      sticky: '+500 STICKY GRAPPLE',
+      sticky: '+500 STICKY ROOF HARPOON',
+      patch: '+500 💊 PATCH BLASTER EQUIPPED',
+      firewall: '+500 🛡 SERVER FIREWALL ARMED',
     };
 
     if (pickup.kind === 'freeze') {
@@ -1248,13 +1509,33 @@ export class GameScene extends Phaser.Scene {
 
     if (pickup.kind === 'shield') {
       this.player.grantShield();
+      this.servers.forEach((s) => s.grantShield(1));
       this.shieldAura?.destroy();
       this.shieldAura = this.add.graphics().setDepth(19);
+    }
+
+    if (pickup.kind === 'firewall') {
+      this.servers.forEach((s) => s.grantShield(2));
+      this.audio.playServerShield();
+    }
+
+    if (pickup.kind === 'patch') {
+      this.savedHarpoonWeapon = this.weapon === 'patch' ? this.savedHarpoonWeapon : this.weapon;
+      this.weapon = 'patch';
+      this.audio.playWeaponSwitch();
     }
 
     if (pickup.kind === 'double') this.weapon = 'double';
     if (pickup.kind === 'triple') this.weapon = 'triple';
     if (pickup.kind === 'sticky') this.weapon = 'sticky';
+
+    this.scene.get('UI').events.emit('hud', {
+      score: this.score,
+      lives: this.lives,
+      time: Math.ceil(this.remaining),
+      weapon: this.weapon.toUpperCase(),
+      aimMode: this.aimMode,
+    });
 
     const text = this.add
       .text(pickup.x, pickup.y - 20, labels[pickup.kind], {
@@ -1283,27 +1564,62 @@ export class GameScene extends Phaser.Scene {
   private loseLife(): void {
     if (this.gameOverActive || this.lives <= 0) return;
     this.lives -= 1;
-    this.weapon = 'standard';
-    this.remaining = 75;
     this.comboCount = 0;
 
-    this.reactAntagonist(
-      this.world === 'cybersec'
-        ? '[ ☠ BREACH ] AI HACKER // ACCESS GRANTED!'
-        : this.world === 'ai'
-        ? '[ ☠ BREACH ] ROGUE LLM // SYSTEM COMPROMISED!'
-        : '[ ☠ OUTAGE ] CI/CD // FATAL ERROR 500!',
-      0xff2a55,
-    );
-
-    this.cameras.main.shake(0.014, 160);
+    this.cameras.main.shake(0.016, 180);
     this.audio.playPlayerHit();
 
+    // Update HUD telemetry immediately
+    this.scene.get('UI').events.emit('hud', {
+      score: this.score,
+      lives: this.lives,
+      time: Math.ceil(this.remaining),
+      weapon: this.weapon.toUpperCase(),
+      aimMode: this.aimMode,
+    });
+
     if (this.lives === 0) {
+      Logger.error('All 5 operative nodes depleted! System shutdown.');
+      this.reactAntagonist(
+        this.world === 'cybersec'
+          ? '[ ☠ FATAL BREACH ] SYSTEM SHUTDOWN // ALL 5 NODES LOST!'
+          : this.world === 'ai'
+          ? '[ ☠ FATAL COLLAPSE ] NEURAL WEIGHTS CORRUPTED!'
+          : '[ ☠ FATAL OUTAGE ] CI/CD TERMINATED // SERVICE DOWN!',
+        0xff2a55,
+      );
       this.gameOver();
     } else {
-      this.player.reset();
-      this.loadStage();
+      Logger.warn(`Operative node damaged! Nodes remaining: ${this.lives}/5`);
+      // GAME CONTINUES EXACTLY IN CURRENT STATUS!
+      // No stage reload! All orbs, servers, timer, and score continue seamless!
+      this.player.iframeUntil = this.time.now + 3500;
+      const nodesLeft = this.lives === 1 ? '1 NODE REMAINING!' : `${this.lives} NODES REMAINING!`;
+      this.reactAntagonist(`[ ⚠ NODE CRASHED ] ${nodesLeft}`, 0xffd700);
+
+      const toast = this.add
+        .text(this.player.x, this.player.y - 48, `NODE LOST! // ${nodesLeft}`, {
+          fontFamily: "'Orbitron', monospace",
+          fontSize: '12px',
+          color: '#ff2a55',
+          fontStyle: 'bold',
+          backgroundColor: '#040b16dd',
+          padding: { x: 8, y: 4 },
+        })
+        .setOrigin(0.5)
+        .setDepth(50);
+
+      this.tweens.add({
+        targets: toast,
+        y: toast.y - 28,
+        alpha: 0,
+        duration: 1100,
+        onComplete: () => toast.destroy(),
+      });
+
+      if (this.player.isGrounded()) {
+        this.player.setVelocityY(-140);
+      }
     }
   }
 
@@ -1322,9 +1638,11 @@ export class GameScene extends Phaser.Scene {
 
     this.audio.playLevelClear();
     setHighScore(this.world, this.mode, this.score);
+    Logger.info(`Stage cleared! Sector: ${this.world}, Stage: ${this.stage}, Score: ${this.score}`);
 
     const banner = this.add
       .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, 450, 95, 0x060e1a, 0.95)
+      .setScrollFactor(0)
       .setStrokeStyle(2, WORLDS[this.world].accent)
       .setDepth(80);
 
@@ -1335,6 +1653,7 @@ export class GameScene extends Phaser.Scene {
         color: '#ffffff',
         fontStyle: 'bold',
       })
+      .setScrollFactor(0)
       .setOrigin(0.5)
       .setDepth(81);
 
@@ -1350,6 +1669,7 @@ export class GameScene extends Phaser.Scene {
         color: WORLDS[this.world].accentHex,
         fontStyle: 'bold',
       })
+      .setScrollFactor(0)
       .setOrigin(0.5)
       .setDepth(81);
 
@@ -1375,20 +1695,25 @@ export class GameScene extends Phaser.Scene {
     this.lives = 0;
     this.physics.world.pause();
     this.harpoon.clear();
-    this.orbs.forEach((orb) => orb.setVelocity(0, 0));
-    this.player.setVelocity(0, 0);
+    this.orbs.forEach((orb) => {
+      if (orb.active && orb.body) orb.setVelocity(0, 0);
+    });
+    if (this.player.active && this.player.body) this.player.setVelocity(0, 0);
 
     this.audio.playGameOver();
+    Logger.error(`Game Over: Mission terminated. Final score: ${this.score}`);
     this.scene
       .get('UI')
       .events.emit('hud', { score: this.score, lives: 0, time: 0, weapon: 'STANDARD' });
 
     this.add
       .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x03060c, 0.94)
+      .setScrollFactor(0)
       .setDepth(100);
 
     this.add
       .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, 480, 260, 0x08101e, 0.98)
+      .setScrollFactor(0)
       .setStrokeStyle(2, 0xff2a55)
       .setDepth(101);
 
@@ -1401,15 +1726,17 @@ export class GameScene extends Phaser.Scene {
         stroke: '#000000',
         strokeThickness: 5,
       })
+      .setScrollFactor(0)
       .setOrigin(0.5)
       .setDepth(102);
 
     this.add
-      .text(GAME_WIDTH / 2, 235, 'CRITICAL ZERO-DAY BREACH // ALL NODES DOWN', {
+      .text(GAME_WIDTH / 2, 235, 'CRITICAL ZERO-DAY BREACH // ALL 5 NODES DOWN', {
         fontFamily: "'Share Tech Mono', monospace",
         fontSize: '13px',
         color: '#ff8c00',
       })
+      .setScrollFactor(0)
       .setOrigin(0.5)
       .setDepth(102);
 
@@ -1420,6 +1747,7 @@ export class GameScene extends Phaser.Scene {
         color: '#ffffff',
         fontStyle: 'bold',
       })
+      .setScrollFactor(0)
       .setOrigin(0.5)
       .setDepth(102);
 
@@ -1431,9 +1759,15 @@ export class GameScene extends Phaser.Scene {
         backgroundColor: '#00f0ff',
         padding: { x: 20, y: 10 },
       })
+      .setScrollFactor(0)
       .setOrigin(0.5)
       .setDepth(102)
       .setInteractive();
+
+    menuButton.on('pointerover', () => menuButton.setBackgroundColor('#ffffff'));
+    menuButton.on('pointerout', () => menuButton.setBackgroundColor('#00f0ff'));
+    menuButton.on('pointerdown', () => this.scene.start('Menu'));
+    this.input.keyboard?.once('keydown-ENTER', () => this.scene.start('Menu'));
 
     menuButton.on('pointerover', () => menuButton.setBackgroundColor('#ffffff'));
     menuButton.on('pointerout', () => menuButton.setBackgroundColor('#00f0ff'));

@@ -12,11 +12,29 @@ function svg(markup: string): string {
 const hero = svg(`
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <defs><filter id="g"><feGaussianBlur stdDeviation="2"/></filter></defs>
-  <rect x="18" y="25" width="28" height="28" rx="8" fill="#10273a" stroke="#00f0ff" stroke-width="3"/>
-  <circle cx="32" cy="18" r="12" fill="#dffcff" stroke="#00f0ff" stroke-width="3"/>
-  <path d="M24 18h16M32 10v16" stroke="#00f0ff" stroke-width="2" opacity=".9"/>
-  <rect x="23" y="53" width="18" height="5" rx="2" fill="#00f0ff" opacity=".8"/>
-  <circle cx="32" cy="18" r="18" fill="none" stroke="#00f0ff" opacity=".35" filter="url(#g)"/>
+  <!-- Scarf streamers -->
+  <path d="M26 28 C14 26 4 32 6 38 C14 34 24 32 28 32 Z" fill="#ff2244" stroke="#060913" stroke-width="2"/>
+  <!-- Dark Jacket & Armor -->
+  <rect x="18" y="27" width="28" height="23" rx="4" fill="#152238" stroke="#060913" stroke-width="2.5"/>
+  <rect x="23" y="30" width="18" height="15" rx="2" fill="#243a5e"/>
+  <path d="M32 30v15" stroke="#00f0ff" stroke-width="2"/>
+  <polygon points="32,32 35,36 32,40 29,36" fill="#ffd700"/>
+  <!-- Popped Crimson Scarf Collar -->
+  <rect x="21" y="24" width="22" height="7" rx="3" fill="#ff2244" stroke="#060913" stroke-width="2"/>
+  <rect x="30" y="25" width="4" height="5" fill="#ffd700"/>
+  <!-- Head & Anime Face -->
+  <polygon points="24,14 24,24 32,27 38,27 40,20 40,14" fill="#ffe2cc" stroke="#060913" stroke-width="2"/>
+  <!-- Glowing Magenta Visor -->
+  <rect x="27" y="15" width="16" height="8" rx="2" fill="#ff007f" stroke="#060913" stroke-width="2"/>
+  <path d="M30 21l4-5M35 21l4-5" stroke="#ffffff" stroke-width="1.8"/>
+  <!-- Spiky Electric Cyan Hair -->
+  <polygon points="24,16 16,13 20,8 14,5 23,6 23,0 30,5 34,0 38,6 45,2 42,9 48,11 42,14 40,16 38,12 28,14" fill="#00f0ff" stroke="#060913" stroke-width="2"/>
+  <path d="M25 3l3 3M33 3l3 3" stroke="#ffffff" stroke-width="1.5"/>
+  <!-- Chunky Sneaker Soles -->
+  <rect x="18" y="52" width="12" height="6" rx="2" fill="#1e293b" stroke="#060913" stroke-width="2"/>
+  <rect x="34" y="52" width="12" height="6" rx="2" fill="#1e293b" stroke="#060913" stroke-width="2"/>
+  <rect x="19" y="56" width="10" height="2" fill="#00f0ff"/>
+  <rect x="35" y="56" width="10" height="2" fill="#00f0ff"/>
 </svg>`);
 
 const orbSvg = (icon: string, color: string) => svg(`

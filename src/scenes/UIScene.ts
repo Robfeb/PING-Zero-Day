@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { Logger } from '../utils/logger';
 
 export class UIScene extends Phaser.Scene {
   private scoreText?: Phaser.GameObjects.Text;
@@ -10,7 +11,10 @@ export class UIScene extends Phaser.Scene {
   private aimBtn?: Phaser.GameObjects.Text;
   private musicBtn?: Phaser.GameObjects.Text;
   private pauseBtn?: Phaser.GameObjects.Text;
+  private logsBtn?: Phaser.GameObjects.Text;
   private pauseOverlay?: Phaser.GameObjects.Container;
+  private logsModal?: Phaser.GameObjects.Container;
+  private logsRefreshTimer?: Phaser.Time.TimerEvent;
 
   constructor() {
     super('UI');
@@ -45,30 +49,30 @@ export class UIScene extends Phaser.Scene {
       fontStyle: 'bold',
     });
 
-    // 2. Lives Display (Icons + Label)
-    this.add.text(125, 5, 'NODES', {
+    // 2. Lives Display (5 Nodes)
+    this.add.text(116, 5, 'NODES (5)', {
       fontFamily: "'Orbitron', sans-serif",
       fontSize: '8px',
       color: '#00f0ff',
       fontStyle: 'bold',
     });
     this.lifeIcons = [];
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 5; i++) {
       const icon = this.add
-        .image(135 + i * 18, 21, 'hero_life')
-        .setDisplaySize(15, 17)
+        .image(124 + i * 18, 22, 'hero_life')
+        .setDisplaySize(16, 18)
         .setAlpha(1);
       this.lifeIcons.push(icon);
     }
 
-    // 3. Aim Mode Toggle Button (Default Vertical)
+    // 3. Aim Mode Toggle Button (Default Vertical, V or T key)
     this.aimBtn = this.add
-      .text(245, 16, '⇡ AIM: VERTICAL', {
+      .text(250, 16, '⇡ AIM [V]', {
         fontFamily: "'Orbitron', monospace",
         fontSize: '9px',
         color: '#00f0ff',
         backgroundColor: '#0a1828',
-        padding: { x: 7, y: 4 },
+        padding: { x: 6, y: 4 },
       })
       .setOrigin(0.5)
       .setInteractive();
@@ -76,14 +80,14 @@ export class UIScene extends Phaser.Scene {
     this.aimBtn.on('pointerover', () => this.aimBtn?.setBackgroundColor('#142b44'));
     this.aimBtn.on('pointerout', () =>
       this.aimBtn?.setBackgroundColor(
-        this.aimBtn.text.includes('VERTICAL') ? '#0a1828' : '#281c08',
+        this.aimBtn.text.includes('VERT') ? '#0a1828' : '#281c08',
       ),
     );
     this.aimBtn.on('pointerdown', () => this.toggleAimMode());
 
     // 4. Central Mission Countdown Timer
     this.add
-      .text(355, 4, 'SYS.TIMER', {
+      .text(335, 4, 'SYS.TIMER', {
         fontFamily: "'Orbitron', sans-serif",
         fontSize: '8px',
         color: '#9aa8b8',
@@ -91,9 +95,9 @@ export class UIScene extends Phaser.Scene {
       .setOrigin(0.5, 0);
 
     this.timerText = this.add
-      .text(355, 14, '01:15', {
+      .text(335, 14, '01:15', {
         fontFamily: "'Orbitron', monospace",
-        fontSize: '14px',
+        fontSize: '13px',
         color: '#ffffff',
         fontStyle: 'bold',
       })
@@ -101,48 +105,55 @@ export class UIScene extends Phaser.Scene {
 
     // 5. Server Defense Indicator
     this.serverText = this.add
-      .text(465, 16, '', {
+      .text(415, 16, '', {
         fontFamily: "'Orbitron', monospace",
         fontSize: '10px',
         color: '#39ff14',
         fontStyle: 'bold',
         backgroundColor: '#071810',
-        padding: { x: 6, y: 3 },
+        padding: { x: 5, y: 3 },
       })
       .setOrigin(0.5)
       .setVisible(false);
 
     // 6. Boss Objective Indicator (AI / DevOps modes)
     this.bossHudText = this.add
-      .text(560, 16, '', {
+      .text(505, 16, '', {
         fontFamily: "'Orbitron', monospace",
         fontSize: '10px',
         color: '#c77dff',
         fontStyle: 'bold',
         backgroundColor: '#1b0928',
-        padding: { x: 6, y: 3 },
+        padding: { x: 5, y: 3 },
       })
       .setOrigin(0.5)
       .setVisible(false);
 
-    // 7. Active Weapon Telemetry Badge
+    // 7. Active Weapon Toggle Button (RJ45 Harpoon ⇄ PATCH Blaster)
     this.weaponBadge = this.add
-      .text(665, 16, 'WIRE: RJ45', {
+      .text(605, 16, '⚡ RJ45 [Q]', {
         fontFamily: "'Orbitron', monospace",
-        fontSize: '10px',
+        fontSize: '9px',
         color: '#ffd700',
+        backgroundColor: '#0a1828',
+        padding: { x: 7, y: 4 },
         fontStyle: 'bold',
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setInteractive();
+
+    this.weaponBadge.on('pointerover', () => this.weaponBadge?.setBackgroundColor('#142b44'));
+    this.weaponBadge.on('pointerout', () => this.weaponBadge?.setBackgroundColor('#0a1828'));
+    this.weaponBadge.on('pointerdown', () => this.toggleWeapon());
 
     // 8. Reset Level Button
     const resetBtn = this.add
-      .text(765, 16, '↺ RESET', {
+      .text(695, 16, '↺ RESET [R]', {
         fontFamily: "'Orbitron', monospace",
         fontSize: '9px',
         color: '#ff8c00',
         backgroundColor: '#16120b',
-        padding: { x: 7, y: 4 },
+        padding: { x: 6, y: 4 },
       })
       .setOrigin(0.5)
       .setInteractive();
@@ -151,14 +162,30 @@ export class UIScene extends Phaser.Scene {
     resetBtn.on('pointerout', () => resetBtn.setBackgroundColor('#16120b'));
     resetBtn.on('pointerdown', () => this.triggerReset());
 
-    // 9. Audio / BGM Toggle Button (Random track each toggle)
+    // 9. Diagnostics Logs Button
+    this.logsBtn = this.add
+      .text(775, 16, '📋 LOGS [L]', {
+        fontFamily: "'Orbitron', monospace",
+        fontSize: '9px',
+        color: '#00f0ff',
+        backgroundColor: '#071626',
+        padding: { x: 6, y: 4 },
+      })
+      .setOrigin(0.5)
+      .setInteractive();
+
+    this.logsBtn.on('pointerover', () => this.logsBtn?.setBackgroundColor('#102d4e'));
+    this.logsBtn.on('pointerout', () => this.logsBtn?.setBackgroundColor('#071626'));
+    this.logsBtn.on('pointerdown', () => this.toggleLogsModal());
+
+    // 10. Audio / BGM Toggle Button (Random track each toggle)
     this.musicBtn = this.add
-      .text(850, 16, 'BGM ♫', {
+      .text(855, 16, 'BGM ♫', {
         fontFamily: "'Orbitron', monospace",
         fontSize: '9px',
         color: '#7cff6b',
         backgroundColor: '#0a1626',
-        padding: { x: 7, y: 4 },
+        padding: { x: 6, y: 4 },
       })
       .setOrigin(0.5)
       .setInteractive();
@@ -176,7 +203,7 @@ export class UIScene extends Phaser.Scene {
       this.musicBtn?.setColor(enabled ? '#7cff6b' : '#ff5555');
     });
 
-    // 10. Pause Button
+    // 11. Pause Button
     this.pauseBtn = this.add
       .text(935, 16, '||', {
         fontFamily: "'Orbitron', monospace",
@@ -187,6 +214,8 @@ export class UIScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setInteractive();
+
+    this.pauseBtn.on('pointerdown', () => this.togglePause());
 
     this.pauseBtn.on('pointerdown', () => this.togglePause());
 
@@ -225,13 +254,15 @@ export class UIScene extends Phaser.Scene {
 
         // Weapon badge with cyberpunk iconography
         const weaponMap: Record<string, string> = {
-          standard: '[|] RJ45',
-          double: '[||] DUAL',
-          triple: '[\\|/] TRIPLE',
-          sticky: '[⚓] STICKY',
+          standard: '⚡ RJ45 [Q]',
+          double: '⚡ DUAL RJ45 [Q]',
+          triple: '⚡ TRIPLE RJ45 [Q]',
+          sticky: '⚡ STICKY ROOF [Q]',
+          patch: '💊 PATCH [Q]',
         };
         const label = weaponMap[data.weapon.toLowerCase()] ?? data.weapon.toUpperCase();
         this.weaponBadge?.setText(label);
+        this.weaponBadge?.setColor(data.weapon.toLowerCase() === 'patch' ? '#39ff14' : '#ffd700');
 
         // Server Defense Telemetry
         if (data.serversTotal && data.serversTotal > 0) {
@@ -288,9 +319,15 @@ export class UIScene extends Phaser.Scene {
     });
 
     this.input.keyboard?.on('keydown-P', () => this.togglePause());
-    this.input.keyboard?.on('keydown-ESC', () => this.togglePause());
-    this.input.keyboard?.on('keydown-R', () => this.triggerReset());
-    this.input.keyboard?.on('keydown-T', () => this.toggleAimMode());
+    this.input.keyboard?.on('keydown-ESC', () => {
+      if (this.logsModal) {
+        this.toggleLogsModal();
+      } else {
+        this.togglePause();
+      }
+    });
+    this.input.keyboard?.on('keydown-L', () => this.toggleLogsModal());
+    this.input.keyboard?.on('keydown-BACKTICK', () => this.toggleLogsModal());
   }
 
   private toggleAimMode(): void {
@@ -301,13 +338,22 @@ export class UIScene extends Phaser.Scene {
     this.updateAimBadge(mode);
   }
 
+  private toggleWeapon(): void {
+    const game = this.scene.get('Game') as Phaser.Scene & {
+      toggleWeapon: () => 'harpoon' | 'patch';
+    };
+    if (typeof game.toggleWeapon === 'function') {
+      game.toggleWeapon();
+    }
+  }
+
   private updateAimBadge(mode: 'vertical' | 'angled'): void {
     if (mode === 'vertical') {
-      this.aimBtn?.setText('⇡ AIM: VERTICAL');
+      this.aimBtn?.setText('⇡ AIM: VERT [V]');
       this.aimBtn?.setColor('#00f0ff');
       this.aimBtn?.setBackgroundColor('#0a1828');
     } else {
-      this.aimBtn?.setText('⤢ AIM: ANGLED');
+      this.aimBtn?.setText('⤢ AIM: ANGLE [V]');
       this.aimBtn?.setColor('#ffd700');
       this.aimBtn?.setBackgroundColor('#281c08');
     }
@@ -318,7 +364,215 @@ export class UIScene extends Phaser.Scene {
     game.resetCurrentStage();
   }
 
+  public toggleLogsModal(): void {
+    if (this.logsModal) {
+      this.logsRefreshTimer?.destroy();
+      this.logsRefreshTimer = undefined;
+      this.logsModal.destroy();
+      this.logsModal = undefined;
+      return;
+    }
+
+    const game = this.scene.get('Game') as any;
+    const cx = 480;
+    const cy = 270;
+    const w = 880;
+    const h = 480;
+
+    this.logsModal = this.add.container(0, 0).setDepth(400);
+
+    // Dark backdrop
+    const scrim = this.add
+      .rectangle(cx, cy, 960, 540, 0x02050e, 0.9)
+      .setInteractive();
+    this.logsModal.add(scrim);
+
+    // Main window panel
+    const panel = this.add.graphics();
+    panel.fillStyle(0x050f1d, 0.98);
+    panel.fillRect(cx - w / 2, cy - h / 2, w, h);
+    panel.lineStyle(2, 0x00f0ff, 0.9);
+    panel.strokeRect(cx - w / 2, cy - h / 2, w, h);
+
+    // Glowing corner brackets
+    panel.fillStyle(0x00f0ff, 1);
+    panel.fillRect(cx - w / 2, cy - h / 2, 16, 3);
+    panel.fillRect(cx - w / 2, cy - h / 2, 3, 16);
+    panel.fillRect(cx + w / 2 - 16, cy - h / 2, 16, 3);
+    panel.fillRect(cx + w / 2 - 3, cy - h / 2, 3, 16);
+    panel.fillRect(cx - w / 2, cy + h / 2 - 3, 16, 3);
+    panel.fillRect(cx - w / 2, cy + h / 2 - 16, 3, 16);
+    panel.fillRect(cx + w / 2 - 16, cy + h / 2 - 3, 16, 3);
+    panel.fillRect(cx + w / 2 - 3, cy + h / 2 - 16, 3, 16);
+    this.logsModal.add(panel);
+
+    // Modal Title Bar
+    const title = this.add
+      .text(cx, cy - h / 2 + 22, 'SYSTEM DIAGNOSTICS & TELEMETRY // REAL-TIME LOGS', {
+        fontFamily: "'Orbitron', sans-serif",
+        fontSize: '15px',
+        color: '#00f0ff',
+        fontStyle: '900',
+        stroke: '#000000',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5);
+    this.logsModal.add(title);
+
+    // Subtitle
+    const subtitle = this.add
+      .text(cx, cy - h / 2 + 42, 'LIVE ENGINE TELEMETRY  |  PRESS [ L ] OR [ ESC ] TO DISMISS', {
+        fontFamily: "'Share Tech Mono', monospace",
+        fontSize: '11px',
+        color: '#7fa0be',
+      })
+      .setOrigin(0.5);
+    this.logsModal.add(subtitle);
+
+    // Telemetry text display
+    const telemetryText = this.add
+      .text(cx - w / 2 + 24, cy - h / 2 + 58, '', {
+        fontFamily: "'Share Tech Mono', monospace",
+        fontSize: '11px',
+        color: '#bdfcff',
+        lineSpacing: 4,
+      });
+    this.logsModal.add(telemetryText);
+
+    // Separator line
+    const sep = this.add.graphics();
+    sep.lineStyle(1, 0x00f0ff, 0.35);
+    sep.lineBetween(cx - w / 2 + 20, cy - h / 2 + 124, cx + w / 2 - 20, cy - h / 2 + 124);
+    this.logsModal.add(sep);
+
+    // Log Stream Header
+    const logHeader = this.add
+      .text(cx - w / 2 + 24, cy - h / 2 + 132, 'EVENT AUDIT TRAIL (MOST RECENT FIRST):', {
+        fontFamily: "'Orbitron', monospace",
+        fontSize: '11px',
+        color: '#ffd700',
+        fontStyle: 'bold',
+      });
+    this.logsModal.add(logHeader);
+
+    // Log lines container
+    const logsText = this.add
+      .text(cx - w / 2 + 24, cy - h / 2 + 154, '', {
+        fontFamily: "'Share Tech Mono', monospace",
+        fontSize: '11px',
+        color: '#d4ecff',
+        lineSpacing: 5,
+      });
+    this.logsModal.add(logsText);
+
+    // Refresh function for telemetry & logs
+    const updateModalData = () => {
+      const fps = this.game.loop.actualFps.toFixed(1);
+      const delta = this.game.loop.delta.toFixed(1);
+      const orbsCount = game?.orbs?.filter((o: any) => o.active)?.length ?? 0;
+      const bodiesCount = game?.physics?.world?.bodies?.entries?.length ?? 0;
+      const inFlightHarpoons = game?.harpoon?.inFlightCount ?? 0;
+      const activeHarpoons = game?.harpoon?.activeCount ?? 0;
+      const patchCount = game?.patchBullets?.length ?? 0;
+      const playerPos = game?.player ? `(${Math.round(game.player.x)}, ${Math.round(game.player.y)})` : 'N/A';
+      const playerState = game?.player?.state ?? 'N/A';
+      const playerLives = game?.lives ?? 'N/A';
+      const playerShield = game?.player?.shield ? 'YES' : 'NO';
+      const audioStatus = game?.audio ? (game.audio.isMuted() ? 'MUTED' : 'ACTIVE') : 'N/A';
+      const musicTrack = game?.getMusicTrackName ? game.getMusicTrackName() : 'N/A';
+      const serversAlive = game?.servers?.filter((s: any) => !s.isDestroyed)?.length ?? 0;
+      const serversTotal = game?.servers?.length ?? 0;
+
+      telemetryText.setText(
+        `• ENGINE: FPS ${fps} / 60.0  |  Frame Delta: ${delta}ms  |  Physics Bodies: ${bodiesCount}\n` +
+        `• OBJECTS: Threats: ${orbsCount}  |  Servers: ${serversAlive}/${serversTotal} Alive  |  RJ45 In-Flight: ${inFlightHarpoons}  |  Fixed Roof: ${Math.max(0, activeHarpoons - inFlightHarpoons)}  |  PATCH: ${patchCount}\n` +
+        `• OPERATIVE: Pos ${playerPos}  |  State: ${playerState}  |  Lives: ${playerLives}/5  |  WAF Shield: ${playerShield}  |  Audio: ${audioStatus} [${musicTrack}]`
+      );
+
+      const entries = Logger.getLogs().slice(-14).reverse();
+      if (entries.length === 0) {
+        logsText.setText('No events logged yet.');
+      } else {
+        const lines = entries.map((e) => {
+          const levelTag = e.level === 'ERROR' ? '[ERROR]' : e.level === 'WARN' ? '[WARN]' : e.level === 'PERF' ? '[PERF]' : '[INFO]';
+          return `${e.timestamp} ${levelTag.padEnd(8)} ${e.message}`;
+        });
+        logsText.setText(lines.join('\n'));
+      }
+    };
+
+    updateModalData();
+    this.logsRefreshTimer = this.time.addEvent({
+      delay: 350,
+      callback: updateModalData,
+      loop: true,
+    });
+
+    // Modal Control Buttons at bottom
+    const btnY = cy + h / 2 - 30;
+
+    // Clear Logs Button
+    const clearBtn = this.add
+      .text(cx - 240, btnY, '↺ CLEAR LOGS', {
+        fontFamily: "'Orbitron', monospace",
+        fontSize: '11px',
+        color: '#ff8c00',
+        backgroundColor: '#1b1207',
+        padding: { x: 12, y: 6 },
+      })
+      .setOrigin(0.5)
+      .setInteractive();
+    clearBtn.on('pointerdown', () => {
+      Logger.clear();
+      updateModalData();
+    });
+    this.logsModal.add(clearBtn);
+
+    // Copy Diagnostics Button
+    const copyBtn = this.add
+      .text(cx, btnY, '📋 COPY DIAGNOSTICS', {
+        fontFamily: "'Orbitron', monospace",
+        fontSize: '11px',
+        color: '#00f0ff',
+        backgroundColor: '#0a1d33',
+        padding: { x: 14, y: 6 },
+      })
+      .setOrigin(0.5)
+      .setInteractive();
+    copyBtn.on('pointerdown', () => {
+      const logs = Logger.getLogs().map((e) => `[${e.timestamp}] [${e.level}] ${e.message}`).join('\n');
+      const telemetry = telemetryText.text;
+      const fullText = `PING! ZERO-DAY DIAGNOSTICS REPORT\n==============================\n${telemetry}\n\nLOG HISTORY:\n${logs}`;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(fullText).then(() => {
+          copyBtn.setText('✔ COPIED TO CLIPBOARD!');
+          this.time.delayedCall(1200, () => copyBtn.setText('📋 COPY DIAGNOSTICS'));
+        });
+      }
+    });
+    this.logsModal.add(copyBtn);
+
+    // Close Button
+    const closeBtn = this.add
+      .text(cx + 240, btnY, '✖ CLOSE [ ESC / L ]', {
+        fontFamily: "'Orbitron', monospace",
+        fontSize: '11px',
+        color: '#ffffff',
+        backgroundColor: '#ff2a55',
+        fontStyle: 'bold',
+        padding: { x: 14, y: 6 },
+      })
+      .setOrigin(0.5)
+      .setInteractive();
+    closeBtn.on('pointerdown', () => this.toggleLogsModal());
+    this.logsModal.add(closeBtn);
+  }
+
   private togglePause(): void {
+    if (this.logsModal) {
+      this.toggleLogsModal();
+      return;
+    }
     const game = this.scene.get('Game');
     if (game.scene.isPaused()) {
       game.scene.resume();

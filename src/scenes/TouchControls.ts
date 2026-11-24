@@ -16,6 +16,7 @@ export class TouchControls extends Phaser.Scene {
       stopPlayer: () => void;
       jumpPlayer: () => void;
       toggleAimMode: () => 'vertical' | 'angled';
+      toggleWeapon: () => 'harpoon' | 'patch';
     };
 
     const makeBtn = (
@@ -79,7 +80,9 @@ export class TouchControls extends Phaser.Scene {
     // Dedicated Jump Button next to movement D-Pad
     makeBtn(190, 455, '⤒ JUMP', 64, 44, () => game.jumpPlayer());
 
-    // Aim Mode Toggle & Multi-Directional FIRE cluster on bottom-right
+    // Weapon Switch, Aim Mode Toggle, Diagnostics Logs & Multi-Directional FIRE cluster on bottom-right
+    makeBtn(585, 455, '📋 LOGS', 56, 44, () => (this.scene.get('UI') as any)?.toggleLogsModal());
+    makeBtn(650, 455, '⇄ WPN', 56, 44, () => game.toggleWeapon());
     makeBtn(715, 455, '⇡ AIM', 56, 44, () => game.toggleAimMode());
     makeBtn(780, 455, '↖', 40, 44, () => game.fire(-0.6));
     makeBtn(850, 455, '⚡ FIRE', 80, 44, () => game.fire(0));

@@ -11,6 +11,8 @@ export interface ActiveHarpoon {
   angleRad: number;
   dirX: number;
   dirY: number;
+  isFixed?: boolean;
+  fixedAt?: number;
   stickyUntil?: number;
   sparkTimer?: number;
 }
@@ -27,6 +29,10 @@ export class Harpoon {
     return this.wires.filter((item) => item.wire.active).length;
   }
 
+  get inFlightCount(): number {
+    return this.wires.filter((item) => item.wire.active && !item.isFixed).length;
+  }
+
   get activeWires(): ActiveHarpoon[] {
     return this.wires.filter((item) => item.wire.active);
   }
@@ -40,7 +46,9 @@ export class Harpoon {
     baseAngleRad = 0,
   ): void {
     const limit = mode === 'triple' ? 3 : mode === 'double' ? 2 : 1;
-    if (this.activeCount >= limit) return;
+    // Only in-flight wires count against the active firing limit!
+    // Fixed harpoons anchored on the roof are UNLIMITED!
+    if (this.inFlightCount >= limit) return;
     const count = limit;
 
     const textureKey = this.scene.textures.exists(tipTexture) ? tipTexture : 'harpoon-rj45';
@@ -103,13 +111,13 @@ export class Harpoon {
     }
   }
 
-  update(delta: number, stickyMode: boolean, time: number): void {
+  update(delta: number, _stickyMode: boolean, time: number): void {
     const worldWidth = this.scene.physics.world.bounds.width || this.scene.scale.width;
 
     for (const item of this.wires) {
       if (!item.wire.active) continue;
 
-      if (!item.stickyUntil) {
+      if (!item.isFixed) {
         // Grow outward along angle vector
         item.height = Math.min(item.height + (950 * delta) / 1000, 800);
         item.wire.setSize(item.wire.width, item.height);
@@ -127,37 +135,43 @@ export class Harpoon {
         const reachedMax = item.height >= 800;
         const reachedBoundary = item.tip.y <= 0 || item.tip.x <= 0 || item.tip.x >= worldWidth;
 
+        // When harpoon reaches the roof, it becomes an UNLIMITED fixed harpoon!
+        // Stays anchored indefinitely until an orb collides with it!
         if (reachedMax || reachedBoundary) {
-          if (stickyMode) {
-            item.stickyUntil = time + 3500;
-          } else {
-            this.destroy(item);
-          }
+          item.isFixed = true;
+          item.fixedAt = time;
+          if (item.tip.y <= 0) item.tip.y = 0;
+
+          const anchorFlare = this.scene.add
+            .circle(item.tip.x, item.tip.y + 2, 4, 0x00f0ff, 0.9)
+            .setDepth(20);
+          this.scene.tweens.add({
+            targets: anchorFlare,
+            scale: 1.8,
+            alpha: 0,
+            duration: 250,
+            onComplete: () => anchorFlare.destroy(),
+          });
         }
       } else {
-        // Sticky latched flashing in final 1.0s
-        const flashing = time - item.stickyUntil > -1000;
-        const alpha = flashing ? (Math.floor(time / 90) % 2 === 0 ? 0.25 : 1) : 1;
-        item.tip.setAlpha(alpha);
-        item.wire.setAlpha(alpha);
+        // FIXED HARPOON ON ROOF: Stays anchored indefinitely until hit by an orb!
+        if (item.wire instanceof Phaser.GameObjects.TileSprite) {
+          item.wire.tilePositionY -= (delta / 1000) * 450;
+        }
 
-        // Latch spark shower
+        // Latch spark shower from the ceiling anchor
         if (!item.sparkTimer || time > item.sparkTimer) {
-          item.sparkTimer = time + 200;
+          item.sparkTimer = time + 280;
           const spark = this.scene.add
             .circle(item.tip.x + (Math.random() * 8 - 4), item.tip.y + 4, 2, 0x00f0ff, 0.8)
             .setDepth(20);
           this.scene.tweens.add({
             targets: spark,
-            y: spark.y + 16,
+            y: spark.y + 14,
             alpha: 0,
-            duration: 200,
+            duration: 250,
             onComplete: () => spark.destroy(),
           });
-        }
-
-        if (time >= item.stickyUntil) {
-          this.destroy(item);
         }
       }
     }

@@ -2,13 +2,37 @@ import Phaser from 'phaser';
 import { getHighScore } from '../utils/storage';
 import { WORLDS } from '../config/themes';
 import type { WorldId, GameMode } from '../config/constants';
+import { SynthAudio } from '../audio/SynthAudio';
 
 export class MenuScene extends Phaser.Scene {
   private world: WorldId = 'cybersec';
   private mode: GameMode = 'campaign';
-  private cards: Record<WorldId, { container: Phaser.GameObjects.Container; bg: Phaser.GameObjects.Graphics }> = {} as any;
-  private modeButtons: Record<GameMode, { text: Phaser.GameObjects.Text; bg: Phaser.GameObjects.Graphics }> = {} as any;
+  private focusedRow: 'sector' | 'protocol' | 'action' = 'sector';
+  private focusedAction: 'deploy' | 'wizard' = 'deploy';
+  private currentWizardStep = 0;
+  private audio = new SynthAudio();
+  private readonly worldList: WorldId[] = ['cybersec', 'ai', 'devops'];
+  private readonly modeList: GameMode[] = ['campaign', 'endless'];
+
+  private cards: Record<
+    WorldId,
+    {
+      container: Phaser.GameObjects.Container;
+      bg: Phaser.GameObjects.Graphics;
+      title: Phaser.GameObjects.Text;
+      hi: Phaser.GameObjects.Text;
+      badge: Phaser.GameObjects.Text;
+    }
+  > = {} as any;
+
+  private modeButtons: Record<
+    GameMode,
+    { text: Phaser.GameObjects.Text; bg: Phaser.GameObjects.Graphics }
+  > = {} as any;
+
   private highText?: Phaser.GameObjects.Text;
+  private launchBtn?: Phaser.GameObjects.Text;
+  private wizardBtn?: Phaser.GameObjects.Text;
   private wizardContainer?: Phaser.GameObjects.Container;
 
   constructor() {
@@ -115,6 +139,18 @@ export class MenuScene extends Phaser.Scene {
         .setOrigin(0.5);
       container.add(title);
 
+      // Shortcut Number Badge [ 1 / 2 / 3 ]
+      const badge = this.add
+        .text(cardWidth / 2 - 12, -cardHeight / 2 + 10, `[ ${idx + 1} ]`, {
+          fontFamily: "'Share Tech Mono', monospace",
+          fontSize: '11px',
+          color: theme.accentHex,
+          backgroundColor: '#040b16dd',
+          padding: { x: 5, y: 2 },
+        })
+        .setOrigin(1, 0);
+      container.add(badge);
+
       // Weapon
       const weapon = this.add
         .text(0, -8, `WEAPON: ${theme.weapon}`, {
@@ -155,10 +191,12 @@ export class MenuScene extends Phaser.Scene {
 
       hitZone.on('pointerdown', () => {
         this.world = id;
+        this.focusedRow = 'sector';
+        this.audio.playWeaponSwitch();
         this.updateSelection();
       });
 
-      this.cards[id] = { container, bg };
+      this.cards[id] = { container, bg, title, hi, badge };
     });
 
     // 4. SELECT PROTOCOL (Mode Buttons)
@@ -171,15 +209,15 @@ export class MenuScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    const modes: Array<{ id: GameMode; label: string; x: number }> = [
-      { id: 'campaign', label: 'CAMPAIGN // 5 STAGES', x: cx - 140 },
-      { id: 'endless', label: 'ENDLESS // SURVIVAL', x: cx + 140 },
+    const modes: Array<{ id: GameMode; label: string; shortcut: string; x: number }> = [
+      { id: 'campaign', label: 'CAMPAIGN // 5 STAGES', shortcut: '[ C ]', x: cx - 140 },
+      { id: 'endless', label: 'ENDLESS // SURVIVAL', shortcut: '[ E ]', x: cx + 140 },
     ];
 
     modes.forEach((m) => {
       const bg = this.add.graphics();
       const text = this.add
-        .text(m.x, 320, m.label, {
+        .text(m.x, 320, `${m.shortcut} ${m.label}`, {
           fontFamily: "'Orbitron', monospace",
           fontSize: '12px',
           color: '#ffffff',
@@ -191,6 +229,8 @@ export class MenuScene extends Phaser.Scene {
 
       text.on('pointerdown', () => {
         this.mode = m.id;
+        this.focusedRow = 'protocol';
+        this.audio.playWeaponSwitch();
         this.updateSelection();
       });
 
@@ -208,8 +248,8 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     // 5. Pulsing "DEPLOY SYSTEM" Button
-    const launchBtn = this.add
-      .text(cx, 435, '▶ DEPLOY SYSTEM [ INSERT COIN ]', {
+    this.launchBtn = this.add
+      .text(cx, 435, '▶ DEPLOY SYSTEM [ ENTER ]', {
         fontFamily: "'Orbitron', sans-serif",
         fontSize: '16px',
         color: '#050c18',
@@ -221,7 +261,7 @@ export class MenuScene extends Phaser.Scene {
       .setInteractive();
 
     this.tweens.add({
-      targets: launchBtn,
+      targets: this.launchBtn,
       scaleX: 1.04,
       scaleY: 1.04,
       duration: 750,
@@ -230,13 +270,17 @@ export class MenuScene extends Phaser.Scene {
       ease: 'Sine.easeInOut',
     });
 
-    launchBtn.on('pointerover', () => launchBtn.setBackgroundColor('#ffffff'));
-    launchBtn.on('pointerout', () => launchBtn.setBackgroundColor('#00f0ff'));
-    launchBtn.on('pointerdown', () => this.startGame());
+    this.launchBtn.on('pointerover', () => this.launchBtn?.setBackgroundColor('#ffffff'));
+    this.launchBtn.on('pointerout', () => this.launchBtn?.setBackgroundColor(this.focusedRow === 'action' && this.focusedAction === 'deploy' ? '#39ff14' : '#00f0ff'));
+    this.launchBtn.on('pointerdown', () => {
+      this.focusedRow = 'action';
+      this.focusedAction = 'deploy';
+      this.startGame();
+    });
 
     // 6. Interactive "HOW TO PLAY / SYSTEM BOOTCAMP" Button
-    const wizardBtn = this.add
-      .text(cx, 488, '? HOW TO PLAY // SYSTEM BOOTCAMP WIZARD', {
+    this.wizardBtn = this.add
+      .text(cx, 488, '? HOW TO PLAY // SYSTEM BOOTCAMP [ H ]', {
         fontFamily: "'Orbitron', monospace",
         fontSize: '11px',
         color: '#00f0ff',
@@ -248,24 +292,68 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setInteractive();
 
-    wizardBtn.on('pointerover', () => {
-      wizardBtn.setBackgroundColor('#102d4e');
-      wizardBtn.setColor('#ffffff');
+    this.wizardBtn.on('pointerover', () => {
+      this.wizardBtn?.setBackgroundColor('#102d4e');
+      this.wizardBtn?.setColor('#ffffff');
     });
-    wizardBtn.on('pointerout', () => {
-      wizardBtn.setBackgroundColor('#071626');
-      wizardBtn.setColor('#00f0ff');
+    this.wizardBtn.on('pointerout', () => {
+      this.wizardBtn?.setBackgroundColor('#071626');
+      this.wizardBtn?.setColor('#00f0ff');
     });
-    wizardBtn.on('pointerdown', () => this.openWizard(0));
+    this.wizardBtn.on('pointerdown', () => {
+      this.focusedRow = 'action';
+      this.focusedAction = 'wizard';
+      this.openWizard(0);
+    });
 
-    this.input.keyboard?.once('keydown-ENTER', () => this.startGame());
-    this.input.keyboard?.once('keydown-SPACE', () => this.startGame());
-    this.input.keyboard?.on('keydown-H', () => this.openWizard(0));
+    // 7. Keyboard Navigation Hint Bar
+    this.add
+      .text(
+        cx,
+        522,
+        '[ ▲/▼/W/S ] ROW   [ ◀/▶/A/D ] OPTION   [ 1/2/3 ] SECTOR   [ C/E ] MODE   [ ENTER ] CONFIRM',
+        {
+          fontFamily: "'Share Tech Mono', monospace",
+          fontSize: '11px',
+          color: '#65829d',
+          backgroundColor: '#030812cc',
+          padding: { x: 12, y: 3 },
+        },
+      )
+      .setOrigin(0.5);
+
+    // Keyboard Navigation Event Listeners
+    this.input.keyboard?.on('keydown-UP', () => this.navigateRow(-1));
+    this.input.keyboard?.on('keydown-W', () => this.navigateRow(-1));
+    this.input.keyboard?.on('keydown-DOWN', () => this.navigateRow(1));
+    this.input.keyboard?.on('keydown-S', () => this.navigateRow(1));
+
+    this.input.keyboard?.on('keydown-LEFT', () => this.navigateCol(-1));
+    this.input.keyboard?.on('keydown-A', () => this.navigateCol(-1));
+    this.input.keyboard?.on('keydown-RIGHT', () => this.navigateCol(1));
+    this.input.keyboard?.on('keydown-D', () => this.navigateCol(1));
+
+    this.input.keyboard?.on('keydown-ONE', () => this.selectSector(0));
+    this.input.keyboard?.on('keydown-TWO', () => this.selectSector(1));
+    this.input.keyboard?.on('keydown-THREE', () => this.selectSector(2));
+    this.input.keyboard?.on('keydown-NUMPAD_ONE', () => this.selectSector(0));
+    this.input.keyboard?.on('keydown-NUMPAD_TWO', () => this.selectSector(1));
+    this.input.keyboard?.on('keydown-NUMPAD_THREE', () => this.selectSector(2));
+
+    this.input.keyboard?.on('keydown-C', () => this.selectMode('campaign'));
+    this.input.keyboard?.on('keydown-E', () => this.selectMode('endless'));
+
+    this.input.keyboard?.on('keydown-H', () => this.toggleWizard());
+
+    this.input.keyboard?.on('keydown-ENTER', () => this.activateCurrent());
+    this.input.keyboard?.on('keydown-SPACE', () => this.activateCurrent());
+    this.input.keyboard?.on('keydown-ESC', () => this.handleEscape());
 
     this.updateSelection();
   }
 
   private openWizard(step: number): void {
+    this.currentWizardStep = step;
     if (this.wizardContainer) {
       this.wizardContainer.destroy();
       this.wizardContainer = undefined;
@@ -337,8 +425,13 @@ export class MenuScene extends Phaser.Scene {
 
     if (step === 0) {
       // 1. Controls & Plasma Jump
+      const heroPreview = this.add
+        .image(cx - 195, contentBoxY - 40, 'hero_walk_0')
+        .setDisplaySize(38, 50);
+      this.wizardContainer.add(heroPreview);
+
       const h1 = this.add
-        .text(cx, contentBoxY - 40, '1. OPERATIVE MOVEMENT & PLASMA JET JUMP', {
+        .text(cx + 15, contentBoxY - 40, '1. OPERATIVE MOVEMENT & PLASMA JET JUMP', {
           fontFamily: "'Orbitron', sans-serif",
           fontSize: '14px',
           color: '#ffffff',
@@ -367,9 +460,9 @@ export class MenuScene extends Phaser.Scene {
         .setOrigin(0.5);
       this.wizardContainer.add(desc);
     } else if (step === 1) {
-      // 2. Aim Modes (Default Vertical + Angled)
+      // 2. Weapons & Infinite Roof Harpoons
       const h1 = this.add
-        .text(cx, contentBoxY - 40, '2. DEFAULT VERTICAL & ANGLED FREE-AIM', {
+        .text(cx, contentBoxY - 40, '2. WEAPONS: UNLIMITED HARPOONS & VERTICAL PATCH BLASTER', {
           fontFamily: "'Orbitron', sans-serif",
           fontSize: '14px',
           color: '#ffffff',
@@ -382,12 +475,15 @@ export class MenuScene extends Phaser.Scene {
         .text(
           cx,
           contentBoxY + 35,
-          `• DEFAULT AIM [ ⇡ VERTICAL ]:\n` +
-            `  Harpoons shoot straight UP for classic arcade pinpoint accuracy.\n\n` +
-            `• ANGLED AIM TOGGLE [ T ] / [ ⤢ AIM BUTTON ]:\n` +
-            `  Toggle directional mode to fire angled beams while running left or right!\n` +
-            `  Supports mouse cursor aiming (-70° to +70°) and touch direction clusters.\n\n` +
-            `Switch modes anytime mid-combat depending on the threat trajectory!`,
+          `• UNLIMITED FIXED HARPOONS:\n` +
+            `  Harpoons anchored to the ceiling stay fixed indefinitely! You can deploy INFINITE\n` +
+            `  fixed ceiling wires to create a massive defensive web against falling threats.\n\n` +
+            `• VERTICAL "PATCH" BLASTER [ Q ] / [ E ] / [ X ] / [ ⇄ WPN ]:\n` +
+            `  Toggle anytime to fire rapid vertical "PATCH" bullets! Destroys threat orbs, deals\n` +
+            `  critical boss damage, and repairs damaged server infrastructure (+1 HP)!\n\n` +
+            `• ANGLED AIM TOGGLE [ V ] / [ T ] / [ ⤢ AIM ]:\n` +
+            `  Toggle directional mode to fire angled beams while running left/right or with cursor.\n` +
+            `• REAL-TIME DIAGNOSTICS [ L ] / [ 📋 LOGS ] : Monitor engine health and event audit log.`,
           {
             fontFamily: "'Share Tech Mono', monospace",
             fontSize: '13px',
@@ -401,7 +497,7 @@ export class MenuScene extends Phaser.Scene {
     } else if (step === 2) {
       // 3. Real CVE Threats & Infrastructure Defense
       const h1 = this.add
-        .text(cx, contentBoxY - 40, '3. CVE THREAT PACKAGES & SERVER DEFENSE', {
+        .text(cx, contentBoxY - 40, '3. CVE THREATS, SERVER ROOFTOP WALKING & CONTINUOUS PLAY', {
           fontFamily: "'Orbitron', sans-serif",
           fontSize: '14px',
           color: '#ffffff',
@@ -414,12 +510,13 @@ export class MenuScene extends Phaser.Scene {
         .text(
           cx,
           contentBoxY + 35,
-          `• PACKAGES CARRY REAL VULNERABILITIES:\n` +
-            `  Shoot Tier 4 (CVE-2026-0DAY) to split into Tier 3 (CRITICAL RCE), Tier 2 (LOG4J),\n` +
-            `  and Tier 1 (DOS PING) until completely eliminated!\n\n` +
-            `• CRITICAL SERVER INFRASTRUCTURE DEFENSE:\n` +
-            `  Ground server racks can withstand 4 impacts before going offline.\n` +
-            `  Protect your servers! Each surviving server awards +1,000 pts bonus upon stage clear!`,
+          `• WALK ON TOP OF SERVERS:\n` +
+            `  Operatives can leap onto and walk across server rack roofs to gain tactical high ground!\n\n` +
+            `• FORTIFY SERVERS WITH ITEMS & PATCH WEAPONS:\n` +
+            `  Collect Firewall Shields and shoot PATCH bullets at servers to heal and fortify them!\n\n` +
+            `• SEAMLESS CONTINUATION ON DAMAGE (5 NODES):\n` +
+            `  Taking damage continues the game seamlessly in the exact same state with i-frame recovery.\n` +
+            `  No stage reset until you lose your final 5th node!`,
           {
             fontFamily: "'Share Tech Mono', monospace",
             fontSize: '13px',
@@ -537,6 +634,114 @@ export class MenuScene extends Phaser.Scene {
     if (this.wizardContainer) {
       this.wizardContainer.destroy();
       this.wizardContainer = undefined;
+      this.currentWizardStep = 0;
+      this.updateSelection();
+    }
+  }
+
+  private navigateRow(dir: -1 | 1): void {
+    if (this.wizardContainer) return;
+    const rows: Array<'sector' | 'protocol' | 'action'> = ['sector', 'protocol', 'action'];
+    let idx = rows.indexOf(this.focusedRow) + dir;
+    if (idx < 0) idx = rows.length - 1;
+    if (idx >= rows.length) idx = 0;
+    this.focusedRow = rows[idx];
+    this.audio.playWeaponSwitch();
+    this.updateSelection();
+  }
+
+  private navigateCol(dir: -1 | 1): void {
+    if (this.wizardContainer) {
+      if (dir === -1 && this.currentWizardStep > 0) {
+        this.openWizard(this.currentWizardStep - 1);
+        this.audio.playWeaponSwitch();
+      } else if (dir === 1 && this.currentWizardStep < 3) {
+        this.openWizard(this.currentWizardStep + 1);
+        this.audio.playWeaponSwitch();
+      }
+      return;
+    }
+
+    if (this.focusedRow === 'sector') {
+      let idx = this.worldList.indexOf(this.world) + dir;
+      if (idx < 0) idx = this.worldList.length - 1;
+      if (idx >= this.worldList.length) idx = 0;
+      this.world = this.worldList[idx];
+      this.audio.playWeaponSwitch();
+      this.updateSelection();
+    } else if (this.focusedRow === 'protocol') {
+      let idx = this.modeList.indexOf(this.mode) + dir;
+      if (idx < 0) idx = this.modeList.length - 1;
+      if (idx >= this.modeList.length) idx = 0;
+      this.mode = this.modeList[idx];
+      this.audio.playWeaponSwitch();
+      this.updateSelection();
+    } else if (this.focusedRow === 'action') {
+      this.focusedAction = this.focusedAction === 'deploy' ? 'wizard' : 'deploy';
+      this.audio.playWeaponSwitch();
+      this.updateSelection();
+    }
+  }
+
+  private selectSector(index: number): void {
+    if (this.wizardContainer) return;
+    if (index >= 0 && index < this.worldList.length) {
+      this.world = this.worldList[index];
+      this.focusedRow = 'sector';
+      this.audio.playWeaponSwitch();
+      this.updateSelection();
+    }
+  }
+
+  private selectMode(mode: GameMode): void {
+    if (this.wizardContainer) return;
+    this.mode = mode;
+    this.focusedRow = 'protocol';
+    this.audio.playWeaponSwitch();
+    this.updateSelection();
+  }
+
+  private toggleWizard(): void {
+    if (this.wizardContainer) {
+      this.closeWizard();
+      this.audio.playWeaponSwitch();
+    } else {
+      this.focusedRow = 'action';
+      this.focusedAction = 'wizard';
+      this.audio.playWeaponSwitch();
+      this.openWizard(0);
+    }
+  }
+
+  private handleEscape(): void {
+    if (this.wizardContainer) {
+      this.closeWizard();
+      this.audio.playWeaponSwitch();
+    }
+  }
+
+  private activateCurrent(): void {
+    if (this.wizardContainer) {
+      if (this.currentWizardStep < 3) {
+        this.openWizard(this.currentWizardStep + 1);
+        this.audio.playWeaponSwitch();
+      } else {
+        this.closeWizard();
+        this.startGame();
+      }
+      return;
+    }
+
+    if (this.focusedRow === 'action') {
+      if (this.focusedAction === 'wizard') {
+        this.openWizard(0);
+        this.audio.playWeaponSwitch();
+      } else {
+        this.startGame();
+      }
+    } else {
+      // Direct deploy from keyboard confirmation on any row
+      this.startGame();
     }
   }
 
@@ -547,43 +752,122 @@ export class MenuScene extends Phaser.Scene {
     (Object.keys(this.cards) as WorldId[]).forEach((id) => {
       const card = this.cards[id];
       const isSelected = this.world === id;
+      const isRowFocused = this.focusedRow === 'sector';
+      const hasFullFocus = isSelected && isRowFocused;
       const theme = WORLDS[id];
 
       card.bg.clear();
       // Glass fill
-      card.bg.fillStyle(isSelected ? 0x0e1c2e : 0x07111c, 0.9);
+      card.bg.fillStyle(hasFullFocus ? 0x142842 : isSelected ? 0x0c1c2e : 0x060f18, 0.9);
       card.bg.fillRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight);
 
       // Border
-      card.bg.lineStyle(isSelected ? 2.5 : 1, theme.accent, isSelected ? 1 : 0.35);
+      card.bg.lineStyle(
+        hasFullFocus ? 3 : isSelected ? 2 : 1,
+        hasFullFocus ? 0x00f0ff : theme.accent,
+        hasFullFocus ? 1 : isSelected ? 0.75 : 0.35,
+      );
       card.bg.strokeRect(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight);
 
-      if (isSelected) {
+      if (hasFullFocus) {
         // Glowing corner brackets
+        card.bg.fillStyle(0x00f0ff, 1);
+        card.bg.fillRect(-cardWidth / 2, -cardHeight / 2, 14, 4);
+        card.bg.fillRect(-cardWidth / 2, -cardHeight / 2, 4, 14);
+        card.bg.fillRect(cardWidth / 2 - 14, -cardHeight / 2, 14, 4);
+        card.bg.fillRect(cardWidth / 2 - 4, -cardHeight / 2, 4, 14);
+        card.bg.fillRect(-cardWidth / 2, cardHeight / 2 - 4, 14, 4);
+        card.bg.fillRect(-cardWidth / 2, cardHeight / 2 - 14, 4, 14);
+        card.bg.fillRect(cardWidth / 2 - 14, cardHeight / 2 - 4, 14, 4);
+        card.bg.fillRect(cardWidth / 2 - 4, cardHeight / 2 - 14, 4, 14);
+
+        card.title.setText(`▶ ${theme.name} ◀`).setColor('#ffffff');
+        card.badge.setColor('#040a14').setBackgroundColor('#00f0ff');
+      } else if (isSelected) {
         card.bg.fillStyle(theme.accent, 1);
         card.bg.fillRect(-cardWidth / 2, -cardHeight / 2, 10, 3);
         card.bg.fillRect(-cardWidth / 2, -cardHeight / 2, 3, 10);
         card.bg.fillRect(cardWidth / 2 - 10, -cardHeight / 2, 10, 3);
         card.bg.fillRect(cardWidth / 2 - 3, -cardHeight / 2, 3, 10);
+
+        card.title.setText(theme.name).setColor('#ffffff');
+        card.badge.setColor(theme.accentHex).setBackgroundColor('#040b16dd');
+      } else {
+        card.title.setText(theme.name).setColor('#7d93a8');
+        card.badge.setColor('#5c7084').setBackgroundColor('#040b16aa');
       }
+
+      // Sync high score label
+      card.hi.setText(`RECORD: ${String(getHighScore(id, this.mode)).padStart(6, '0')}`);
     });
 
     // Mode Buttons
     (Object.keys(this.modeButtons) as GameMode[]).forEach((m) => {
       const isSelected = this.mode === m;
+      const isRowFocused = this.focusedRow === 'protocol';
+      const hasFullFocus = isSelected && isRowFocused;
       const btn = this.modeButtons[m];
-      btn.text.setColor(isSelected ? '#00f0ff' : '#6f8398');
-      btn.text.setBackgroundColor(isSelected ? '#0c1a2c' : '#07101a');
+
+      if (hasFullFocus) {
+        btn.text.setColor('#040a14');
+        btn.text.setBackgroundColor('#00f0ff');
+        btn.text.setText(
+          m === 'campaign' ? '▶ [ C ] CAMPAIGN // 5 STAGES ◀' : '▶ [ E ] ENDLESS // SURVIVAL ◀',
+        );
+      } else if (isSelected) {
+        btn.text.setColor('#00f0ff');
+        btn.text.setBackgroundColor('#0d2138');
+        btn.text.setText(
+          m === 'campaign' ? '[ C ] CAMPAIGN // 5 STAGES' : '[ E ] ENDLESS // SURVIVAL',
+        );
+      } else {
+        btn.text.setColor('#5c7084');
+        btn.text.setBackgroundColor('#06101a');
+        btn.text.setText(
+          m === 'campaign' ? '[ C ] CAMPAIGN // 5 STAGES' : '[ E ] ENDLESS // SURVIVAL',
+        );
+      }
     });
+
+    // Action Buttons
+    const isActionRow = this.focusedRow === 'action';
+    if (this.launchBtn) {
+      const isLaunchFocused = isActionRow && this.focusedAction === 'deploy';
+      if (isLaunchFocused) {
+        this.launchBtn.setText('▶▶ DEPLOY SYSTEM [ ENTER ] ◀◀');
+        this.launchBtn.setBackgroundColor('#39ff14');
+        this.launchBtn.setColor('#040a14');
+      } else {
+        this.launchBtn.setText('▶ DEPLOY SYSTEM [ ENTER ]');
+        this.launchBtn.setBackgroundColor('#00f0ff');
+        this.launchBtn.setColor('#050c18');
+      }
+    }
+
+    if (this.wizardBtn) {
+      const isWizardFocused = isActionRow && this.focusedAction === 'wizard';
+      if (isWizardFocused) {
+        this.wizardBtn.setText('▶ ? HOW TO PLAY // SYSTEM BOOTCAMP [ H ] ◀');
+        this.wizardBtn.setBackgroundColor('#00f0ff');
+        this.wizardBtn.setColor('#040a14');
+        this.wizardBtn.setStroke('#ffffff', 1);
+      } else {
+        this.wizardBtn.setText('? HOW TO PLAY // SYSTEM BOOTCAMP [ H ]');
+        this.wizardBtn.setBackgroundColor('#071626');
+        this.wizardBtn.setColor('#00f0ff');
+        this.wizardBtn.setStroke('#00f0ff', 1);
+      }
+    }
 
     // Hi-score text
     const high = getHighScore(this.world, this.mode);
     this.highText?.setText(
-      `SECTOR: ${WORLDS[this.world].name}  |  RECORD HIGH: ${String(high).padStart(6, '0')}`,
+      `SECTOR: ${WORLDS[this.world].name}  |  PROTOCOL: ${this.mode.toUpperCase()}  |  RECORD HIGH: ${String(high).padStart(6, '0')}`,
     );
   }
 
   private startGame(): void {
+    this.audio.playPowerUp();
     this.scene.start('Game', { world: this.world, mode: this.mode });
   }
 }
